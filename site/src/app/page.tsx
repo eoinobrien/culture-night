@@ -4,7 +4,7 @@ import { CultureNightEvent } from "@/interfaces/culture-night-event";
 
 import Events from "../api/events.json";
 import dynamic from "next/dynamic";
-import { SetStateAction, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Geocode } from "@/interfaces/geocode";
 import { Time } from "@/interfaces/time";
 import MapFilter from "@/components/MapFilter";
@@ -92,8 +92,8 @@ const filterEventByStringFilter = (
 export default function Home() {
   const events = Events as CultureNightEvent[];
 
-  const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
-  const [selectedGenre, setSelectedGenre] = useState<string[]>([]);
+  // const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
+  // const [selectedGenre, setSelectedGenre] = useState<string[]>([]);
   const [startTime, setStartTime] = useState<Time>({ hour: 15, minute: 0 });
   const [endTime, setEndTime] = useState<Time>({ hour: 3, minute: 0 });
   const [eventType, setEventType] = useState<string>("All");

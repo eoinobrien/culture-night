@@ -35,8 +35,8 @@ export default function MapFilter({
           <option>All</option>
           {options
             .filter((value, index) => options.indexOf(value) === index)
-            .map((option) => (
-              <option>{option}</option>
+            .map((option, index) => (
+              <option key={index}>{option}</option>
             ))}
         </select>
         <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
