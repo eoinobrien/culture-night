@@ -20,7 +20,7 @@ export default function EventMap({ position, zoom, events }: EventMapProps) {
       center={position}
       zoom={zoom}
       scrollWheelZoom={true}
-      className="w-full h-dvh"
+      className="w-full lg:h-dvh h-[80dvh]"
     >
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'

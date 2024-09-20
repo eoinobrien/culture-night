@@ -111,7 +111,7 @@ export default function Home() {
 
   return (
     <div className="max-h-svh">
-      <div className="mx-auto max-w-2xl ring-1 ring-gray-200 flex flex-shrink-1 lg:max-w-none">
+      <div className="mx-auto max-w-2xl ring-1 ring-gray-200 lg:flex lg:flex-shrink-1 lg:max-w-none">
         <div className="p-8 sm:p-10 lg:flex-auto">
           <h1 className="text-3xl font-bold tracking-tight text-gray-900 mb-8">
             Culture Night
@@ -295,7 +295,7 @@ export default function Home() {
             setFilter={setAgeGroup}
           />
         </div>
-        <div className="-mt-2 lg:mt-0 w-full max-w-2/5 flex-shrink-1">
+        <div className="-mt-2 lg:mt-0 lg:w-full lg:max-w-2/5 lg:flex-shrink-1">
           <div className="bg-gray-50 text-center ring-1 ring-inset ring-gray-900/5 lg:flex lg:flex-col lg:justify-center">
             <Map
               position={IrelandLatLng}
@@ -303,9 +303,9 @@ export default function Home() {
               events={events.filter(
                 (e) =>
                   filterEventByTime(startTime, endTime, e) &&
-                filterEventByStringFilter(eventType, e.eventType) &&
-                filterEventByStringFilter(bookingDetails, e.bookingDetails) &&
-                filterEventByStringFilter(ageGroup, e.ageGroup)
+                  filterEventByStringFilter(eventType, e.eventType) &&
+                  filterEventByStringFilter(bookingDetails, e.bookingDetails) &&
+                  filterEventByStringFilter(ageGroup, e.ageGroup)
               )}
             />
           </div>
