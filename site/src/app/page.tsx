@@ -68,7 +68,10 @@ const filterEventByTime = (
 
   // all events that occur inside filter
   // filter: 15:15 - 15:15, event: 15:00 - 16:00 = show
-  if (compareTime(filterStartTime, event.startTime) >= 0) {
+  if (
+    compareTime(filterStartTime, event.startTime) >= 0 &&
+    compareTime(filterStartTime, event.endTime) < 0
+  ) {
     return true;
   }
 
