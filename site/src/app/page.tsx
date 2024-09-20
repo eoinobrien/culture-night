@@ -68,10 +68,7 @@ const filterEventByTime = (
 
   // all events that occur inside filter
   // filter: 15:15 - 15:15, event: 15:00 - 16:00 = show
-  if (
-    compareTime(filterStartTime, event.startTime) >= 0 &&
-    compareTime(filterEndTime, event.endTime) <= 0
-  ) {
+  if (compareTime(filterStartTime, event.startTime) >= 0) {
     return true;
   }
 
@@ -116,9 +113,7 @@ export default function Home() {
           <h1 className="text-3xl font-bold tracking-tight mb-8">
             Culture Night
           </h1>
-          <h3 className="text-xl font-bold tracking-tight mb-2">
-            Filters
-          </h3>
+          <h3 className="text-xl font-bold tracking-tight mb-2">Filters</h3>
           <div className="md:flex md:items-center mb-6">
             <div className="md:w-1/3">
               <label
