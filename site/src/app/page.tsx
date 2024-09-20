@@ -111,21 +111,18 @@ export default function Home() {
 
   return (
     <div className="max-h-svh">
-      <div className="mx-auto max-w-2xl ring-1 ring-gray-200 lg:flex lg:flex-shrink-1 lg:max-w-none">
+      <div className="mx-auto max-w-2xl lg:flex lg:flex-shrink-1 lg:max-w-none">
         <div className="p-8 sm:p-10 lg:flex-auto">
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900 mb-8">
+          <h1 className="text-3xl font-bold tracking-tight mb-8">
             Culture Night
           </h1>
-          <h3 className="text-xl font-bold tracking-tight text-gray-900">
-            Time Period
+          <h3 className="text-xl font-bold tracking-tight mb-2">
+            Filters
           </h3>
-          <h4 className="tracking-tight text-gray-900">
-            Any events that falls within your selected period will be returned.
-          </h4>
           <div className="md:flex md:items-center mb-6">
             <div className="md:w-1/3">
               <label
-                className="block text-gray-500 font-bold md:text-right mb-1 md:mb-0 pr-4"
+                className="block text-gray-300 font-bold md:text-right mb-1 md:mb-0 pr-4"
                 htmlFor="inline-start-time"
               >
                 Start Time
@@ -133,7 +130,7 @@ export default function Home() {
             </div>
             <div className="relative">
               <select
-                className="block appearance-none w-full bg-gray-100 border border-gray-200 text-gray-700 py-3 px-4 pr-8 rounded leading-tight focus:outline-none focus:bg-white focus:border-gray-500"
+                className="block appearance-none w-full bg-gray-800 border border-gray-900 text-gray-200 py-3 px-4 pr-8 rounded leading-tight focus:outline-none focus:bg-gray-800 focus:border-gray-500"
                 id="inline-start-time"
                 value={parseTimeToString(startTime)}
                 onChange={(e) => setStartTime(stringToTime(e.target.value))}
@@ -188,7 +185,7 @@ export default function Home() {
                 <option>02:45</option>
                 <option>03:00</option>
               </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-200">
                 <svg
                   className="fill-current h-4 w-4"
                   xmlns="http://www.w3.org/2000/svg"
@@ -202,7 +199,7 @@ export default function Home() {
           <div className="md:flex md:items-center mb-6">
             <div className="md:w-1/3">
               <label
-                className="block text-gray-500 font-bold md:text-right mb-1 md:mb-0 pr-4"
+                className="block text-gray-300 font-bold md:text-right mb-1 md:mb-0 pr-4"
                 htmlFor="inline-end-time"
               >
                 End Time
@@ -210,7 +207,7 @@ export default function Home() {
             </div>
             <div className="relative">
               <select
-                className="block appearance-none w-full bg-gray-100 border border-gray-200 text-gray-700 py-3 px-4 pr-8 rounded leading-tight focus:outline-none focus:bg-white focus:border-gray-500"
+                className="block appearance-none w-full bg-gray-800 border border-gray-900 text-gray-200 py-3 px-4 pr-8 rounded leading-tight focus:outline-none focus:bg-gray-800 focus:border-gray-500"
                 id="inline-end-time"
                 value={parseTimeToString(endTime)}
                 onChange={(e) => setEndTime(stringToTime(e.target.value))}
@@ -265,7 +262,7 @@ export default function Home() {
                 <option>02:45</option>
                 <option>03:00</option>
               </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-200">
                 <svg
                   className="fill-current h-4 w-4"
                   xmlns="http://www.w3.org/2000/svg"
@@ -296,7 +293,7 @@ export default function Home() {
           />
         </div>
         <div className="-mt-2 lg:mt-0 lg:w-full lg:max-w-2/5 lg:flex-shrink-1">
-          <div className="bg-gray-50 text-center ring-1 ring-inset ring-gray-900/5 lg:flex lg:flex-col lg:justify-center">
+          <div className="text-center lg:flex lg:flex-col lg:justify-center">
             <Map
               position={IrelandLatLng}
               zoom={7}
