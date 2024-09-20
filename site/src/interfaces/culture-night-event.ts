@@ -1,6 +1,6 @@
-import { LatLng } from "leaflet";
 import { Geocode } from "./geocode";
 import { UrlWithTitle } from "./url-with-title"
+import { Time } from "./time";
 
 export type CultureNightEvent = {
     title: string;
@@ -9,8 +9,8 @@ export type CultureNightEvent = {
     description: string;
     locations: UrlWithTitle[],
     time: string;
-    startTime: string;
-    endTime: string;
+    startTime: Time;
+    endTime: Time;
     features: string[],
     host: string; 
     eventType: string; 
