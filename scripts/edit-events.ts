@@ -21,7 +21,10 @@ const getGeocodeData = async (address) => {
   const results = json.results;
 
   if (results.length > 1) {
-    console.log("More than 1 geocode result returned, picking the first", address);
+    console.log(
+      "More than 1 geocode result returned, picking the first",
+      address
+    );
   }
 
   if (results.length == 0) {
@@ -45,6 +48,51 @@ const saveDataToFile = (filePath, data) => {
   console.log("Data saved to:", filePath);
 };
 
+const getGeocodedEvents = async (geocodedFilePath, events) => {
+  const geocodedEvents = [];
+
+  const MAX_CONCURRENT = Number(process.env.MAX_CONCURRENT) || 5;
+  const START_INDEX = Number(process.env.START_INDEX) || 0;
+
+  for (let i = START_INDEX; i < events.length; i += MAX_CONCURRENT) {
+    const batch = events.slice(i, i + MAX_CONCURRENT);
+    console.log(`Processing batch ${i} - ${i + batch.length - 1}`);
+
+    const promises = batch.map(async (event, j) => {
+      const index = i + j;
+
+      console.log("Geocoding", index, "-", event.title, "-", event.fullAddress);
+
+      try {
+        var geocode = await getGeocodeData(event.fullAddress);
+
+        return {
+          ...event,
+          geocode: geocode,
+        };
+      } catch (err) {
+        console.error("Error getting event geocode", index, event.title, event.fullAddress, err);
+        return { ...event, geocodeError: String(err) };
+      }
+    });
+
+    const results = await Promise.all(promises);
+    geocodedEvents.push(...results);
+
+    // Periodically save progress
+    if (
+      geocodedEvents.length % 10 === 0 ||
+      i + MAX_CONCURRENT >= events.length
+    ) {
+      saveDataToFile(geocodedFilePath, geocodedEvents);
+    }
+  }
+
+  // Final save (in case not saved in loop)
+  saveDataToFile(geocodedFilePath, geocodedEvents);
+
+  return geocodedEvents;
+};
 const main = async () => {
   try {
     const eventsFilePath = path.join(__dirname, "enrichedData.json");
@@ -53,25 +101,9 @@ const main = async () => {
     console.log("Length: ", events.length);
     // await new Promise(res => setTimeout(res, 10000));
 
-    const updateEvents = [];
-
     const geocodedFilePath = path.join(__dirname, "geocodedEvents.json");
-    for (let i = 0; i < events.length; i++) {
-      let event = events[i];
 
-      console.log("Geocoding", i, "-", event.title, "-", event.fullAddress);
-
-      var geocode = await getGeocodeData(event.fullAddress);
-
-      updateEvents.push({
-        ...event,
-        geocode: geocode,
-      });
-
-      if (i % 10 === 0) {
-        saveDataToFile(geocodedFilePath, updateEvents);
-      }
-    }
+    const updateEvents = getGeocodedEvents(geocodedFilePath, events);
 
     saveDataToFile(geocodedFilePath, updateEvents);
 

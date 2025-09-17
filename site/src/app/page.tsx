@@ -111,10 +111,10 @@ export default function Home() {
 
   return (
     <div className="max-h-svh">
-      <div className="mx-auto max-w-2xl lg:flex lg:flex-shrink-1 lg:max-w-none">
+      <div className="mx-auto lg:flex lg:flex-shrink-1 lg:max-w-none">
         <div className="p-8 sm:p-10 lg:flex-auto">
           <h1 className="text-3xl font-bold tracking-tight mb-8">
-            Culture Night
+            Culture Night 2025
           </h1>
           <h3 className="text-xl font-bold tracking-tight mb-2">Filters</h3>
           <div className="md:flex md:items-center mb-6">
@@ -290,7 +290,8 @@ export default function Home() {
             setFilter={setAgeGroup}
           />
         </div>
-        <div className="-mt-2 lg:mt-0 lg:w-full lg:max-w-2/5 lg:flex-shrink-1">
+        <div className="h-2 w-screen lg:w-2 lg:h-screen bg-gradient-to-r lg:bg-gradient-to-b from-[#00893e] via-[#ffa300] to-[#ff0000]"></div>
+        <div className="lg:mt-0 lg:w-full lg:max-w-2/5 lg:flex-shrink-1">
           <div className="text-center lg:flex lg:flex-col lg:justify-center">
             <Map
               position={IrelandLatLng}

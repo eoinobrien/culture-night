@@ -14,8 +14,8 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Culture Night 2024 Map",
-  description: "Map for Culture Night 2024 events. Taking place on September 20th, 2024.",
+  title: "Culture Night 2025 Map",
+  description: "Map for Culture Night 2025 events. Taking place on September 19th, 2025.",
 };
 
 export default function RootLayout({
