@@ -8,6 +8,7 @@ import "leaflet-defaulticon-compatibility/dist/leaflet-defaulticon-compatibility
 import { Geocode } from "@/interfaces/geocode";
 import { CultureNightEvent } from "@/interfaces/culture-night-event";
 import PopupEventDetails from "./PopupEventDetails";
+
 type EventMapProps = {
   position: Geocode;
   zoom: number;
@@ -23,8 +24,8 @@ export default function EventMap({ position, zoom, events }: EventMapProps) {
       className="w-full lg:h-dvh h-[80dvh]"
     >
       <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        attribution='&copy; <a href="https://stadiamaps.com/" target="_blank">Stadia Maps</a>, &copy; <a href="https://openmaptiles.org/" target="_blank">OpenMapTiles</a> &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>'
+        url="https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png"
       />
 
       <MarkerClusterGroup chunkedLoading>
@@ -35,7 +36,9 @@ export default function EventMap({ position, zoom, events }: EventMapProps) {
           // console.log(event.title);
           return (
             <Marker key={index} title={event.title} position={event.geocode}>
-              <Popup><PopupEventDetails event={event} /></Popup>
+              <Popup>
+                <PopupEventDetails event={event} />
+              </Popup>
             </Marker>
           );
         })}

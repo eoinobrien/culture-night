@@ -128,7 +128,7 @@ export default function Home() {
             </div>
             <div className="relative">
               <select
-                className="block appearance-none w-full bg-gray-800 border border-gray-900 text-gray-200 py-3 px-4 pr-8 rounded leading-tight focus:outline-none focus:bg-gray-800 focus:border-gray-500"
+                className="block appearance-none w-full bg-gray-700 border border-gray-800 text-gray-200 py-3 px-4 pr-8 rounded leading-tight focus:outline-none focus:bg-gray-600 focus:border-gray-500"
                 id="inline-start-time"
                 value={parseTimeToString(startTime)}
                 onChange={(e) => setStartTime(stringToTime(e.target.value))}
@@ -205,7 +205,7 @@ export default function Home() {
             </div>
             <div className="relative">
               <select
-                className="block appearance-none w-full bg-gray-800 border border-gray-900 text-gray-200 py-3 px-4 pr-8 rounded leading-tight focus:outline-none focus:bg-gray-800 focus:border-gray-500"
+                className="block appearance-none w-full bg-gray-700 border border-gray-800 text-gray-200 py-3 px-4 pr-8 rounded leading-tight focus:outline-none focus:bg-gray-600 focus:border-gray-500"
                 id="inline-end-time"
                 value={parseTimeToString(endTime)}
                 onChange={(e) => setEndTime(stringToTime(e.target.value))}
