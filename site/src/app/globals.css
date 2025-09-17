@@ -17,3 +17,30 @@ body {
 .leaflet-container {
   background: #222222 !important;
 }
+
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip{
+  background: #000 !important;
+  color: #fff !important;
+  box-shadow: 0 3px 14px rgba(175, 175, 175, 0.4) !important;
+}
+
+.leaflet-container a {
+  color: #00A8EC !important;
+}
+
+.leaflet-bar a {
+  background: #374151 !important;
+  color: #fff !important;
+  box-shadow: 0 0 10px rgb(55 65 81) !important;
+}
+
+.leaflet-container .leaflet-control-attribution {
+  background: #000 !important;
+  color: #fff !important;
+  box-shadow: 0 0 3px rgba(175, 175, 175, 0.4) !important;
+}
+
+.leaflet-container .leaflet-control-attribution a {
+  color: #00A8EC !important;
+}
