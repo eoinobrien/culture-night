@@ -19,18 +19,29 @@ type EventMapProps = {
   selectedTitle?: string;
 };
 
-export default function EventMap({ position, zoom, events, selectedTitle }: EventMapProps) {
+export default function EventMap({
+  position,
+  zoom,
+  events,
+  selectedTitle,
+}: EventMapProps) {
   // store marker refs so we can open a popup programmatically
   const markerRefs = useRef<Map<string, L.Marker | null>>(new Map());
-  const clusterRef = useRef<{ zoomToShowLayer?: (layer: L.Layer, cb?: () => void) => void } | null>(null);
+  const clusterRef = useRef<{
+    zoomToShowLayer?: (layer: L.Layer, cb?: () => void) => void;
+  } | null>(null);
   const previousSelectedMarker = useRef<L.Marker | null>(null);
 
   const createIcon = (color = "#2880c9") => {
     const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='25' height='41' viewBox='0 0 25 41'>
       <path d='M12.5 0C7 0 2.5 4.5 2.5 10c0 8.3 10 21 10 21s10-12.7 10-21C22.5 4.5 18 0 12.5 0z' fill='${color}' stroke='#ffffff' stroke-width='1'/>
     </svg>`;
-    const url = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg);
-    const shadowUrl = (L.Icon.Default && (L.Icon.Default.prototype as L.Icon.Default).options && (L.Icon.Default.prototype as L.Icon.Default).options.shadowUrl) || undefined;
+    const url = "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(svg);
+    const shadowUrl =
+      (L.Icon.Default &&
+        (L.Icon.Default.prototype as L.Icon.Default).options &&
+        (L.Icon.Default.prototype as L.Icon.Default).options.shadowUrl) ||
+      undefined;
     return new L.Icon({
       iconUrl: url,
       shadowUrl,
@@ -101,7 +112,10 @@ export default function EventMap({ position, zoom, events, selectedTitle }: Even
       map.setView(ev.geocode, 17, { animate: true });
       if (marker && typeof marker.openPopup === "function") {
         // restore previous
-        if (previousSelectedMarker.current && previousSelectedMarker.current !== marker) {
+        if (
+          previousSelectedMarker.current &&
+          previousSelectedMarker.current !== marker
+        ) {
           try {
             previousSelectedMarker.current.setIcon(new L.Icon.Default());
           } catch {}
@@ -148,7 +162,7 @@ export default function EventMap({ position, zoom, events, selectedTitle }: Even
                 }
               }}
             >
-              <Popup>
+              <Popup minWidth={300}>
                 <PopupEventDetails event={event} />
               </Popup>
             </Marker>
