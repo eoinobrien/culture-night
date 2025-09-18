@@ -11,7 +11,6 @@ interface Props {
   suggestions: string[];
   selectSuggestion: (title: string) => void;
   runSearch: () => void;
-  matchesCount: number;
   setSelectedTitle: (t?: string) => void;
   selectedEvent?: CultureNightEvent | undefined;
 }
@@ -26,13 +25,15 @@ export default function SearchBox({
   suggestions,
   selectSuggestion,
   runSearch,
-  matchesCount,
   setSelectedTitle,
   selectedEvent,
 }: Props) {
   return (
     <div className="mb-6">
-      <label htmlFor="event-search" className="block text-gray-300 font-bold mb-1">
+      <label
+        htmlFor="event-search"
+        className="block text-gray-300 font-bold mb-1"
+      >
         Search events
       </label>
       <div className="relative">
@@ -42,7 +43,7 @@ export default function SearchBox({
             aria-autocomplete="list"
             aria-controls="events-listbox"
             aria-label="Search events"
-            className="w-full bg-gray-700 border border-gray-800 text-gray-200 py-2 pl-3 pr-28 rounded placeholder-gray-400"
+            className="w-full bg-gray-700 border border-gray-800 text-gray-200 py-2 pl-3 pr-14 rounded placeholder-gray-400"
             placeholder="Type event title"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -58,31 +59,26 @@ export default function SearchBox({
               } else if (e.key === "ArrowDown") {
                 e.preventDefault();
                 setShowSuggestions(true);
-                setActiveIndex((i) => (i + 1 + suggestions.length) % suggestions.length);
+                setActiveIndex(
+                  (i) => (i + 1 + suggestions.length) % suggestions.length
+                );
               } else if (e.key === "ArrowUp") {
                 e.preventDefault();
-                setActiveIndex((i) => (i - 1 + suggestions.length) % suggestions.length);
+                setActiveIndex(
+                  (i) => (i - 1 + suggestions.length) % suggestions.length
+                );
               } else if (e.key === "Escape") {
                 setShowSuggestions(false);
               }
             }}
             onFocus={() => setShowSuggestions(true)}
             onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
-            aria-activedescendant={activeIndex >= 0 ? `suggestion-${activeIndex}` : undefined}
+            aria-activedescendant={
+              activeIndex >= 0 ? `suggestion-${activeIndex}` : undefined
+            }
           />
 
           <div className="absolute right-1 top-1 bottom-1 flex items-center gap-1">
-            <button
-              aria-label="Clear search"
-              className="h-full px-3 bg-gray-600 hover:bg-gray-500 text-white rounded focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-green-400"
-              onClick={() => {
-                setSelectedTitle(undefined);
-                setSearchTerm("");
-                setShowSuggestions(false);
-              }}
-            >
-              ×
-            </button>
             <button
               aria-label="Go to event"
               className="h-full px-3 bg-green-600 hover:bg-green-700 text-white rounded focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-green-400"
@@ -94,12 +90,13 @@ export default function SearchBox({
         </div>
       </div>
 
-      <div className="mt-2 text-sm text-gray-300">{matchesCount} result{matchesCount !== 1 ? 's' : ''}</div>
-
       {/* custom suggestions */}
       <div id="events-listbox" role="listbox" className="relative">
         {showSuggestions && suggestions.length > 0 && (
-          <ul className="absolute z-50 mt-1 max-h-48 w-full overflow-auto rounded bg-gray-800 border border-gray-700" role="listbox">
+          <ul
+            className="absolute z-50 mt-1 max-h-48 w-full overflow-auto rounded bg-gray-800 border border-gray-700"
+            role="listbox"
+          >
             {suggestions.slice(0, 20).map((title, i) => (
               <li
                 id={`suggestion-${i}`}
@@ -125,7 +122,9 @@ export default function SearchBox({
                   return (
                     <>
                       {title.substring(0, idx)}
-                      <span className="bg-yellow-300 text-black">{title.substring(idx, idx + term.length)}</span>
+                      <span className="bg-yellow-600 text-black">
+                        {title.substring(idx, idx + term.length)}
+                      </span>
                       {title.substring(idx + term.length)}
                     </>
                   );
@@ -140,13 +139,23 @@ export default function SearchBox({
       {selectedEvent && (
         <div className="mt-3 flex items-center gap-3 rounded bg-gray-800 px-3 py-2">
           <div className="text-sm grow">
-            <div className="font-semibold max-w-[40ch] break-words">{selectedEvent.title}</div>
-            {selectedEvent.venueName && (<div className="text-xs text-gray-400">{selectedEvent.venueName}</div>)}
+            <div className="font-semibold max-w-[40ch] break-words">
+              {selectedEvent.title}
+            </div>
+            {selectedEvent.venueName && (
+              <div className="text-xs text-gray-400">
+                {selectedEvent.venueName}
+              </div>
+            )}
           </div>
           <button
             aria-label="Clear selection"
             className="ml-2 px-2 py-1 bg-gray-600 rounded text-white"
-            onClick={() => setSelectedTitle(undefined)}
+            onClick={() => {
+              setSelectedTitle(undefined);
+              setSearchTerm("");
+              setShowSuggestions(false);
+            }}
           >
             Clear
           </button>

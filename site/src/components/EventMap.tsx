@@ -21,16 +21,16 @@ type EventMapProps = {
 
 export default function EventMap({ position, zoom, events, selectedTitle }: EventMapProps) {
   // store marker refs so we can open a popup programmatically
-  const markerRefs = useRef<Map<string, any>>(new Map());
-  const clusterRef = useRef<any>(null);
-  const previousSelectedMarker = useRef<any>(null);
+  const markerRefs = useRef<Map<string, L.Marker | null>>(new Map());
+  const clusterRef = useRef<{ zoomToShowLayer?: (layer: L.Layer, cb?: () => void) => void } | null>(null);
+  const previousSelectedMarker = useRef<L.Marker | null>(null);
 
   const createIcon = (color = "#2880c9") => {
     const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='25' height='41' viewBox='0 0 25 41'>
       <path d='M12.5 0C7 0 2.5 4.5 2.5 10c0 8.3 10 21 10 21s10-12.7 10-21C22.5 4.5 18 0 12.5 0z' fill='${color}' stroke='#ffffff' stroke-width='1'/>
     </svg>`;
     const url = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg);
-    const shadowUrl = (L.Icon.Default && (L.Icon.Default.prototype as any).options && (L.Icon.Default.prototype as any).options.shadowUrl) || undefined;
+    const shadowUrl = (L.Icon.Default && (L.Icon.Default.prototype as L.Icon.Default).options && (L.Icon.Default.prototype as L.Icon.Default).options.shadowUrl) || undefined;
     return new L.Icon({
       iconUrl: url,
       shadowUrl,
@@ -49,7 +49,7 @@ export default function EventMap({ position, zoom, events, selectedTitle }: Even
   }: {
     events: CultureNightEvent[];
     selectedTitle?: string;
-    markerRefs: React.MutableRefObject<Map<string, any>>;
+    markerRefs: React.MutableRefObject<Map<string, L.Marker | null>>;
   }) {
     const map = useMap();
 
@@ -75,21 +75,21 @@ export default function EventMap({ position, zoom, events, selectedTitle }: Even
               ) {
                 try {
                   previousSelectedMarker.current.setIcon(new L.Icon.Default());
-                } catch (e) {}
+                } catch {}
               }
               // set selected icon and open popup
               try {
                 marker.setIcon(createIcon("#fe9a00"));
-              } catch (e) {}
+              } catch {}
               setTimeout(() => {
                 try {
                   marker.openPopup();
-                } catch (e) {}
+                } catch {}
               }, 100);
               previousSelectedMarker.current = marker;
-            } catch (e) {}
+            } catch {}
           });
-        } catch (e) {
+        } catch {
           // fallback
           map.setView(ev.geocode, 17, { animate: true });
           setTimeout(() => marker?.openPopup?.(), 300);
@@ -104,15 +104,15 @@ export default function EventMap({ position, zoom, events, selectedTitle }: Even
         if (previousSelectedMarker.current && previousSelectedMarker.current !== marker) {
           try {
             previousSelectedMarker.current.setIcon(new L.Icon.Default());
-          } catch (e) {}
+          } catch {}
         }
         try {
-          marker.setIcon(createSelectedIcon());
-        } catch (e) {}
+          marker.setIcon(createIcon("#fe9a00"));
+        } catch {}
         setTimeout(() => marker.openPopup(), 300);
         previousSelectedMarker.current = marker;
       }
-    }, [selectedTitle, events, map]);
+    }, [selectedTitle, events, markerRefs, map]);
 
     return null;
   }

@@ -9,26 +9,8 @@ import { Geocode } from "@/interfaces/geocode";
 import { Time } from "@/interfaces/time";
 import SearchBox from "@/components/SearchBox";
 import FiltersColumn from "@/components/FiltersColumn";
-import MapFilter from "@/components/MapFilter";
 
 const IrelandLatLng: Geocode = { lat: 53.4230965, lng: -7.9254405 };
-
-const parseTimeToString = (time: Time): string => {
-  return `${time.hour.toLocaleString("en-IE", {
-    minimumIntegerDigits: 2,
-    useGrouping: false,
-  })}:${time.minute.toLocaleString("en-IE", {
-    minimumIntegerDigits: 2,
-    useGrouping: false,
-  })}`;
-};
-
-const stringToTime = (str: string): Time => {
-  return {
-    hour: Number(str.split(":")[0]),
-    minute: Number(str.split(":")[1]),
-  };
-};
 
 const adjustHoursPastMidnight = (hour: number): number => {
   return hour < 15 ? hour + 24 : hour;
@@ -133,21 +115,24 @@ export default function Home() {
   // live suggestions computed from searchTerm
   const suggestions = useMemo(() => {
     const term = searchTerm.trim();
-    if (!term) return events.map((e) => e.title);
+
+    const filterEvents = events.filter(
+      (e) =>
+        filterEventByTime(startTime, endTime, e) &&
+        filterEventByStringFilter(eventType, e.eventType) &&
+        filterEventByStringFilter(bookingDetails, e.bookingDetails) &&
+        filterEventByStringFilter(ageGroup, e.ageGroup)
+    );
+
+    if (!term) return filterEvents.map((e) => e.title);
     return (
-      events
+      filterEvents
         .filter((e) => matchEvent(e, term))
         .map((e) => e.title)
         // remove duplicates
         .filter((v, i, a) => a.indexOf(v) === i)
     );
-  }, [events, searchTerm]);
-
-  // count of suggestion results (defined after suggestions is computed)
-  const matchesCount = suggestions.length;
-
-  // UI: filters collapsed on mobile
-  const [filtersOpen, setFiltersOpen] = useState<boolean>(true);
+  }, [events, searchTerm, startTime, endTime, eventType, bookingDetails, ageGroup]);
 
   const selectedEvent = selectedTitle
     ? events.find((e) => e.title === selectedTitle)
@@ -196,7 +181,6 @@ export default function Home() {
             suggestions={suggestions}
             selectSuggestion={selectSuggestion}
             runSearch={runSearch}
-            matchesCount={matchesCount}
             setSelectedTitle={(t) => setSelectedTitle(t)}
             selectedEvent={selectedEvent}
           />
