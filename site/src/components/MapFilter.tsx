@@ -16,16 +16,16 @@ export default function MapFilter({
   setFilter,
 }: MapFilterProps) {
   return (
-    <div className="md:flex md:items-center mb-6">
-      <div className="md:w-1/3">
+    <div className="flex items-center mb-4">
+      <div className="w-1/3 md:w-1/4">
         <label
-          className="block text-gray-300 font-bold md:text-right mb-1 md:mb-0 pr-4"
+          className="block text-gray-300 font-bold text-right mb-1 md:mb-0 pr-4"
           htmlFor={`inline-${label.replace(" ", "-").toLocaleLowerCase()}`}
         >
           {label}
         </label>
       </div>
-      <div className="relative">
+      <div className="relative grow">
         <select
           className="block appearance-none w-full bg-gray-700 border border-gray-800 text-gray-200 py-3 px-4 pr-8 rounded leading-tight focus:outline-none focus:bg-gray-600 focus:border-gray-500"
           id={`inline-${label.replace(" ", "-").toLocaleLowerCase()}`}

@@ -7,6 +7,8 @@ import dynamic from "next/dynamic";
 import { useMemo, useState } from "react";
 import { Geocode } from "@/interfaces/geocode";
 import { Time } from "@/interfaces/time";
+import SearchBox from "@/components/SearchBox";
+import FiltersColumn from "@/components/FiltersColumn";
 import MapFilter from "@/components/MapFilter";
 
 const IrelandLatLng: Geocode = { lat: 53.4230965, lng: -7.9254405 };
@@ -100,6 +102,72 @@ export default function Home() {
   const [bookingDetails, setBookingDetails] = useState<string>("All");
   const [ageGroup, setAgeGroup] = useState<string>("All");
 
+  // search state
+  const [searchTerm, setSearchTerm] = useState<string>("");
+  const [selectedTitle, setSelectedTitle] = useState<string | undefined>(
+    undefined
+  );
+
+  // autocomplete UI state
+  const [showSuggestions, setShowSuggestions] = useState<boolean>(false);
+  const [activeIndex, setActiveIndex] = useState<number>(-1);
+
+  // flexible search matcher: matches title, locations, genres, venueName, address, description, host, eventType, ageGroup
+  const matchEvent = (ev: CultureNightEvent, term: string) => {
+    const t = term.toLowerCase();
+    if (!t) return false;
+    if ((ev.title || "").toLowerCase().includes(t)) return true;
+    if (ev.venueName && ev.venueName.toLowerCase().includes(t)) return true;
+    if (ev.fullAddress && ev.fullAddress.toLowerCase().includes(t)) return true;
+    if (ev.host && ev.host.toLowerCase().includes(t)) return true;
+    if (
+      ev.locations &&
+      ev.locations.some((l) => l.title.toLowerCase().includes(t))
+    )
+      return true;
+    if (ev.genres && ev.genres.some((g) => g.title.toLowerCase().includes(t)))
+      return true;
+    return false;
+  };
+
+  // live suggestions computed from searchTerm
+  const suggestions = useMemo(() => {
+    const term = searchTerm.trim();
+    if (!term) return events.map((e) => e.title);
+    return (
+      events
+        .filter((e) => matchEvent(e, term))
+        .map((e) => e.title)
+        // remove duplicates
+        .filter((v, i, a) => a.indexOf(v) === i)
+    );
+  }, [events, searchTerm]);
+
+  // count of suggestion results (defined after suggestions is computed)
+  const matchesCount = suggestions.length;
+
+  // UI: filters collapsed on mobile
+  const [filtersOpen, setFiltersOpen] = useState<boolean>(true);
+
+  const selectedEvent = selectedTitle
+    ? events.find((e) => e.title === selectedTitle)
+    : undefined;
+
+  const runSearch = () => {
+    const term = searchTerm.trim();
+    if (!term) return;
+    const found = events.find((e) => matchEvent(e, term));
+    if (found) setSelectedTitle(found.title);
+  };
+
+  const selectSuggestion = (title: string) => {
+    setSearchTerm(title);
+    setShowSuggestions(false);
+    setActiveIndex(-1);
+    // select immediately
+    setSelectedTitle(title);
+  };
+
   const Map = useMemo(
     () =>
       dynamic(() => import("@/components/EventMap"), {
@@ -112,186 +180,42 @@ export default function Home() {
   return (
     <div className="max-h-svh">
       <div className="mx-auto lg:flex lg:flex-shrink-1 lg:max-w-none">
-        <div className="p-8 sm:p-10 lg:flex-auto">
-          <h1 className="text-3xl font-bold tracking-tight mb-8">
-            Culture Night 2025
-          </h1>
-          <h3 className="text-xl font-bold tracking-tight mb-2">Filters</h3>
-          <div className="md:flex md:items-center mb-6">
-            <div className="md:w-1/3">
-              <label
-                className="block text-gray-300 font-bold md:text-right mb-1 md:mb-0 pr-4"
-                htmlFor="inline-start-time"
-              >
-                Start Time
-              </label>
-            </div>
-            <div className="relative">
-              <select
-                className="block appearance-none w-full bg-gray-700 border border-gray-800 text-gray-200 py-3 px-4 pr-8 rounded leading-tight focus:outline-none focus:bg-gray-600 focus:border-gray-500"
-                id="inline-start-time"
-                value={parseTimeToString(startTime)}
-                onChange={(e) => setStartTime(stringToTime(e.target.value))}
-              >
-                <option>15:00</option>
-                <option>15:15</option>
-                <option>15:30</option>
-                <option>15:45</option>
-                <option>16:00</option>
-                <option>16:15</option>
-                <option>16:30</option>
-                <option>16:45</option>
-                <option>17:00</option>
-                <option>17:15</option>
-                <option>17:30</option>
-                <option>17:45</option>
-                <option>18:00</option>
-                <option>18:15</option>
-                <option>18:30</option>
-                <option>18:45</option>
-                <option>19:00</option>
-                <option>19:15</option>
-                <option>19:30</option>
-                <option>19:45</option>
-                <option>20:00</option>
-                <option>20:15</option>
-                <option>20:30</option>
-                <option>20:45</option>
-                <option>21:00</option>
-                <option>21:15</option>
-                <option>21:30</option>
-                <option>21:45</option>
-                <option>22:00</option>
-                <option>22:15</option>
-                <option>22:30</option>
-                <option>22:45</option>
-                <option>23:00</option>
-                <option>23:15</option>
-                <option>23:30</option>
-                <option>23:45</option>
-                <option>00:00</option>
-                <option>00:15</option>
-                <option>00:30</option>
-                <option>00:45</option>
-                <option>01:00</option>
-                <option>01:15</option>
-                <option>01:30</option>
-                <option>01:45</option>
-                <option>02:00</option>
-                <option>02:15</option>
-                <option>02:30</option>
-                <option>02:45</option>
-                <option>03:00</option>
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-200">
-                <svg
-                  className="fill-current h-4 w-4"
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 20 20"
-                >
-                  <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
-                </svg>
-              </div>
-            </div>
+        <div className="p-4 sm:p-6 lg:w-[30%]">
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold tracking-tight">Culture Night</h1>
+            <h2 className="text-sm">September 19th, 2025</h2>
           </div>
-          <div className="md:flex md:items-center mb-6">
-            <div className="md:w-1/3">
-              <label
-                className="block text-gray-300 font-bold md:text-right mb-1 md:mb-0 pr-4"
-                htmlFor="inline-end-time"
-              >
-                End Time
-              </label>
-            </div>
-            <div className="relative">
-              <select
-                className="block appearance-none w-full bg-gray-700 border border-gray-800 text-gray-200 py-3 px-4 pr-8 rounded leading-tight focus:outline-none focus:bg-gray-600 focus:border-gray-500"
-                id="inline-end-time"
-                value={parseTimeToString(endTime)}
-                onChange={(e) => setEndTime(stringToTime(e.target.value))}
-              >
-                <option>15:00</option>
-                <option>15:15</option>
-                <option>15:30</option>
-                <option>15:45</option>
-                <option>16:00</option>
-                <option>16:15</option>
-                <option>16:30</option>
-                <option>16:45</option>
-                <option>17:00</option>
-                <option>17:15</option>
-                <option>17:30</option>
-                <option>17:45</option>
-                <option>18:00</option>
-                <option>18:15</option>
-                <option>18:30</option>
-                <option>18:45</option>
-                <option>19:00</option>
-                <option>19:15</option>
-                <option>19:30</option>
-                <option>19:45</option>
-                <option>20:00</option>
-                <option>20:15</option>
-                <option>20:30</option>
-                <option>20:45</option>
-                <option>21:00</option>
-                <option>21:15</option>
-                <option>21:30</option>
-                <option>21:45</option>
-                <option>22:00</option>
-                <option>22:15</option>
-                <option>22:30</option>
-                <option>22:45</option>
-                <option>23:00</option>
-                <option>23:15</option>
-                <option>23:30</option>
-                <option>23:45</option>
-                <option>00:00</option>
-                <option>00:15</option>
-                <option>00:30</option>
-                <option>00:45</option>
-                <option>01:00</option>
-                <option>01:15</option>
-                <option>01:30</option>
-                <option>01:45</option>
-                <option>02:00</option>
-                <option>02:15</option>
-                <option>02:30</option>
-                <option>02:45</option>
-                <option>03:00</option>
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-200">
-                <svg
-                  className="fill-current h-4 w-4"
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 20 20"
-                >
-                  <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
-                </svg>
-              </div>
-            </div>
-          </div>
-          <MapFilter
-            label="Event type"
-            options={events.map((e) => e.eventType)}
-            filterValue={eventType}
-            setFilter={setEventType}
+
+          <SearchBox
+            searchTerm={searchTerm}
+            setSearchTerm={setSearchTerm}
+            showSuggestions={showSuggestions}
+            setShowSuggestions={setShowSuggestions}
+            activeIndex={activeIndex}
+            setActiveIndex={setActiveIndex}
+            suggestions={suggestions}
+            selectSuggestion={selectSuggestion}
+            runSearch={runSearch}
+            matchesCount={matchesCount}
+            setSelectedTitle={(t) => setSelectedTitle(t)}
+            selectedEvent={selectedEvent}
           />
-          <MapFilter
-            label="Booking details"
-            options={events.map((e) => e.bookingDetails)}
-            filterValue={bookingDetails}
-            setFilter={setBookingDetails}
-          />
-          <MapFilter
-            label="Age group"
-            options={events.map((e) => e.ageGroup)}
-            filterValue={ageGroup}
-            setFilter={setAgeGroup}
+          <FiltersColumn
+            startTime={startTime}
+            endTime={endTime}
+            setStartTime={setStartTime}
+            setEndTime={setEndTime}
+            eventType={eventType}
+            setEventType={setEventType}
+            bookingDetails={bookingDetails}
+            setBookingDetails={setBookingDetails}
+            ageGroup={ageGroup}
+            setAgeGroup={setAgeGroup}
+            events={events}
           />
         </div>
         <div className="h-2 w-screen lg:w-2 lg:h-screen bg-gradient-to-r lg:bg-gradient-to-b from-[#00893e] via-[#ffa300] to-[#ff0000]"></div>
-        <div className="lg:mt-0 lg:w-full lg:max-w-2/5 lg:flex-shrink-1">
+        <div className="lg:mt-0 lg:w-[70%] lg:flex-shrink-1">
           <div className="text-center lg:flex lg:flex-col lg:justify-center">
             <Map
               position={IrelandLatLng}
@@ -303,6 +227,7 @@ export default function Home() {
                   filterEventByStringFilter(bookingDetails, e.bookingDetails) &&
                   filterEventByStringFilter(ageGroup, e.ageGroup)
               )}
+              selectedTitle={selectedTitle}
             />
           </div>
         </div>
