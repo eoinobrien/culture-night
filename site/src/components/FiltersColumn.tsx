@@ -52,6 +52,10 @@ export default function FiltersColumn({
       <div className="flex items-center justify-between mb-2">
         <h3 className="text-xl font-bold tracking-tight">Filters</h3>
       </div>
+      <p id="availability-help" className="mb-4 text-sm text-gray-300">
+        Shows events overlapping any part of your availability. Check event
+        details for fixed start times and admission rules.
+      </p>
       <div>
         <div className="flex items-center mb-4">
           <div className="w-1/3 md:w-1/4">
@@ -59,13 +63,14 @@ export default function FiltersColumn({
               className="block text-gray-300 font-bold text-right mb-1 md:mb-0 pr-4"
               htmlFor="inline-start-time"
             >
-              Start Time
+              Available from
             </label>
           </div>
           <div className="relative grow">
             <select
               className="block appearance-none w-full bg-gray-700 border border-gray-800 text-gray-200 py-3 px-4 pr-8 rounded leading-tight focus:outline-none focus:bg-gray-600 focus:border-gray-500"
               id="inline-start-time"
+              aria-describedby="availability-help"
               value={parseTimeToString(startTime)}
               onChange={(e) => setStartTime(stringToTime(e.target.value))}
             >
@@ -137,13 +142,14 @@ export default function FiltersColumn({
               className="block text-gray-300 font-bold text-right mb-1 md:mb-0 pr-4"
               htmlFor="inline-end-time"
             >
-              End Time
+              Available until
             </label>
           </div>
           <div className="relative grow">
             <select
               className="block appearance-none w-full bg-gray-700 border border-gray-800 text-gray-200 py-3 px-4 pr-8 rounded leading-tight focus:outline-none focus:bg-gray-600 focus:border-gray-500"
               id="inline-end-time"
+              aria-describedby="availability-help"
               value={parseTimeToString(endTime)}
               onChange={(e) => setEndTime(stringToTime(e.target.value))}
             >
