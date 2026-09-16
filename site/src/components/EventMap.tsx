@@ -148,7 +148,7 @@ export default function EventMap({
       <MarkerClusterGroup ref={clusterRef} chunkedLoading>
         {events.map((event, index) => {
           if (event.geocode === null) {
-            return <></>;
+            return null;
           }
           return (
             <Marker

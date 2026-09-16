@@ -1,268 +1,166 @@
-const playwright = require("playwright");
-const randomUseragent = require("random-useragent");
-const fs = require("fs");
-const path = require("path");
+const { chromium } = require("playwright");
+const fs = require("node:fs");
+const path = require("node:path");
+const { createHash } = require("node:crypto");
+const {
+  fetchText,
+  parseTimeRange,
+  saveJson,
+  validateEvents,
+} = require("./event-data.cjs");
 
-const BASE_URL = "https://culturenight.ie/events/?sf_paged=";
+const BASE_URL = "https://culturenight.ie/events/";
 
-const getBasicEvents = async (eventsFilePath, context) => {
-  const allEvents = [];
-
-  const LIST_CONCURRENCY = Number(process.env.LIST_CONCURRENCY) || 5;
-  let pageNumber = 1;
-  let done = false;
-
-  while (!done) {
-    const batchNumbers = Array.from(
-      { length: LIST_CONCURRENCY },
-      (_, i) => pageNumber + i
-    );
-
-    const pageResults = await Promise.all(
-      batchNumbers.map(async (num) => {
-        const p = await context.newPage({ bypassCSP: true });
-        try {
-          await p.setDefaultTimeout(30000);
-          await p.setViewportSize({ width: 800, height: 600 });
-          await p.goto(BASE_URL + num);
-
-          const noResultsVisible = await p
-            .locator("div.wb-no-results")
-            .isVisible();
-          if (noResultsVisible) {
-            await p.close();
-            return { num, events: [], noResults: true };
-          }
-
-          const pageOfEvents = await scrapeAllEvents(p);
-          await p.close();
-          return { num, events: pageOfEvents, noResults: false };
-        } catch (err) {
-          console.error("Error loading listing page", num, err);
-          try {
-            await p.close();
-          } catch (e) {
-            /* ignore */
-          }
-          return { num, events: [], noResults: true };
-        }
-      })
-    );
-
-    pageResults.sort((a, b) => a.num - b.num);
-
-    for (const res of pageResults) {
-      if (res.noResults) {
-        done = true;
-        break;
-      }
-
-      allEvents.push(...res.events);
-      // Save after each successful page to persist progress
-      saveDataToFile(eventsFilePath, allEvents);
-    }
-
-    pageNumber += LIST_CONCURRENCY;
-  }
-
-  return allEvents;
-};
-
-const getEnrichedEvents = async (enrichedFilePath, context, allEvents) => {
-  const allEnrichedEvents = [];
-
-  const MAX_CONCURRENT = Number(process.env.MAX_CONCURRENT) || 20;
-  const START_INDEX = Number(process.env.START_INDEX) || 0;
-
-  for (let i = START_INDEX; i < allEvents.length; i += MAX_CONCURRENT) {
-    const batch = allEvents.slice(i, i + MAX_CONCURRENT);
-    console.log(`Processing batch ${i} - ${i + batch.length - 1}`);
-
-    const promises = batch.map(async (event, j) => {
-      const index = i + j;
-      console.log("Parsing ", index, ": ", event.url);
-
-      const eventPage = await context.newPage({ bypassCSP: true });
-      try {
-        await eventPage.setDefaultTimeout(30000);
-        await eventPage.setViewportSize({ width: 800, height: 600 });
-        await eventPage.goto(event.url);
-        const enrichedEvent = await scrapeEvent(eventPage);
-        await eventPage.close();
-        return { ...event, ...enrichedEvent };
-      } catch (err) {
-        console.error("Error scraping event", index, event.url, err);
-        try {
-          await eventPage.close();
-        } catch (e) {
-          /* ignore */
-        }
-        return { ...event, scrapeError: String(err) };
-      }
-    });
-
-    const results = await Promise.all(promises);
-    allEnrichedEvents.push(...results);
-
-    // Periodically save progress
-    if (
-      allEnrichedEvents.length % 10 === 0 ||
-      i + MAX_CONCURRENT >= allEvents.length
-    ) {
-      saveDataToFile(enrichedFilePath, allEnrichedEvents);
-    }
-  }
-
-  // Final save (in case not saved in loop)
-  saveDataToFile(enrichedFilePath, allEnrichedEvents);
-
-  return allEnrichedEvents;
-};
-
-const splitTimeToObject = (time) => {
-  const components = time.split(":");
-  return { hour: parseInt(components[0]), minute: parseInt(components[1]) };
-};
-
-const scrapeAllEvents = async (page) => {
-  return page.$$eval(".wb-event-card", (eventCards) => {
-    return eventCards.map((card) => {
-      const getInnerText = (element) => element && element.innerText.trim();
-      const getImgAlt = (element) => element && element.alt;
-      const formatArray = (elements, func) =>
-        elements && [...elements].map((element) => func(element));
-
-      const image = card.querySelector("a.wb-image-container img");
-      const url = card.querySelector("a.wb-event-title-link");
-      const title = card.querySelector("h3.wb-event-title");
-      const description = card.querySelector("div.wb-event-description p");
-      const locations = card.querySelectorAll("p.wb-event-location");
-      const time = getInnerText(card.querySelector("p.wb-event-time"));
-      const times = time.split(" ");
-      const features = card.querySelectorAll("img.wb-facility-icon");
-
-      console.log(image);
-
+async function scrapeListing(page) {
+  const listing = await page.evaluate(() => ({
+    pagination: document.querySelector(".wp-pagenavi .pages")?.textContent,
+    events: Array.from(document.querySelectorAll(".wb-event-card")).map((card) => {
+      const text = (selector) => card.querySelector(selector)?.textContent.trim() || "";
+      const image = card.querySelector(".wb-image-container img");
       return {
-        title: getInnerText(title),
-        image: image.getAttribute("data-src"),
-        url: url.href,
-        description: getInnerText(description),
-        locations: formatArray(locations, getInnerText),
-        time: time,
-        startTime: splitTimeToObject(times[0]),
-        endTime: splitTimeToObject(times[2]),
-        features: formatArray(features, getImgAlt),
+        title: text(".wb-event-title"),
+        image: image?.getAttribute("data-src") || image?.getAttribute("src") || "",
+        url: card.querySelector(".wb-event-title-link")?.href,
+        description: text(".wb-event-description"),
+        locations: Array.from(card.querySelectorAll(".wb-event-location"), (e) => e.textContent.trim()),
+        time: text(".wb-event-time"),
+        features: Array.from(new Set(Array.from(card.querySelectorAll("img.wb-facility-icon"), (e) => e.alt))),
       };
-    });
+    }),
+  }));
+  const pagination = listing.pagination?.match(/Page (\d+) of (\d+)/);
+  if (!pagination || !listing.events.length) {
+    throw new Error("Missing event cards or pagination; the listing markup may have changed.");
+  }
+  return {
+    page: Number(pagination[1]),
+    pages: Number(pagination[2]),
+    events: listing.events.map((event) => ({ ...event, ...parseTimeRange(event.time) })),
+  };
+}
+
+async function scrapeEvent(page) {
+  return page.evaluate(() => {
+    const root = document.querySelector(".elementor-element-d49263f");
+    const descriptions = root?.querySelectorAll(".elementor-element-35d9c75, .elementor-element-5b2edab");
+    if (!descriptions?.length) {
+      throw new Error("Missing event detail content; the detail markup may have changed.");
+    }
+    const text = (selector) => root.querySelector(selector)?.innerText.trim() || "";
+    const links = (selector) => Array.from(root.querySelectorAll(selector), (e) => ({
+      title: e.textContent.trim(),
+      url: e.href,
+    }));
+    const map = root.querySelector(".elementor-widget-google_maps iframe");
+    return {
+      host: text(".elementor-element-3d84bbf .elementor-shortcode"),
+      eventType: text(".elementor-element-c831f54 .elementor-post-info__terms-list"),
+      bookingDetails: text(".elementor-element-0543dab .elementor-shortcode"),
+      bookingLink: root.querySelector(".booking-link a")?.href || null,
+      onlineContentLink: root.querySelector(".link-to-online a")?.href || null,
+      ageGroup: text(".elementor-element-5f74582 .elementor-shortcode"),
+      description: Array.from(descriptions, (element) => element.innerText.trim()).filter(Boolean).join("\n\n"),
+      locations: links(".elementor-element-c5099fa a.elementor-post-info__terms-list-item"),
+      venueName: text(".venue-name p") || null,
+      fullAddress: text(".elementor-element-fc128eb .elementor-heading-title"),
+      genres: links(".elementor-element-109142e a.elementor-post-info__terms-list-item"),
+      features: Array.from(new Set(Array.from(root.querySelectorAll(".wb-facility-icons .wb-event-icon"), (e) =>
+        e.getAttribute("alt") || e.textContent.trim()).filter(Boolean))),
+      mapUrl: map?.getAttribute("data-src") || map?.getAttribute("src") || null,
+    };
   });
-};
+}
 
-const scrapeEvent = async (page) => {
-  return page.$$eval(
-    "div.elementor-element-d49263f > div.elementor-widget-wrap",
-    (ep) => {
-      const eventPage = ep[0];
-
-      const getUrlDetails = (element) =>
-        element && { title: getInnerText(element), url: element.href };
-      const getInnerText = (element) => element && element.innerText.trim();
-      const formatArray = (elements, func) =>
-        elements && [...elements].map((element) => func(element));
-
-      const host = eventPage.querySelector(
-        "div.elementor-element-3d84bbf > div > div"
-      );
-      const isOffline = eventPage.querySelector(
-        "div.elementor-element-c831f54 > div > ul > li > span > span > span.elementor-post-info__terms-list-item"
-      );
-      const bookingIsRequired = eventPage.querySelector(
-        "div.elementor-element-0543dab > div > div"
-      );
-      const bookingLink = eventPage.querySelector("div.booking-link > a");
-      const onlineContentLink = eventPage.querySelector(
-        "div.link-to-online > a"
-      );
-
-      const ageGroup = eventPage.querySelector(
-        "div.elementor-element-5f74582 > div > div > span"
-      );
-
-      const locations = eventPage.querySelectorAll(
-        "div.elementor-element-c5099fa > div > ul > li.elementor-repeater-item-1cb9dcb > span > span > a.elementor-post-info__terms-list-item"
-      );
-      const description = eventPage.querySelector(
-        "div.elementor-element-35d9c75"
-      );
-      let fullAddress = eventPage.querySelector(
-        "div.elementor-element-fc128eb > div.elementor-widget-container > div.elementor-heading-title"
-      );
-      fullAddress = fullAddress && getInnerText(fullAddress);
-
-      let venueName = eventPage.querySelector(
-        "div.elementor-element-709165a > div > div > div > div > p"
-      );
-
-      const genres = eventPage.querySelectorAll(
-        "div.elementor-element-109142e > div > ul > li > span > span > a.elementor-post-info__terms-list-item"
-      );
-
-      return {
-        host: getInnerText(host),
-        eventType: getInnerText(isOffline),
-        bookingDetails: getInnerText(bookingIsRequired),
-        bookingLink: bookingLink && bookingLink.href,
-        onlineContentLink: onlineContentLink && onlineContentLink.href,
-        ageGroup: getInnerText(ageGroup),
-        description: getInnerText(description),
-        locations: formatArray(locations, getUrlDetails),
-        venueName: getInnerText(venueName),
-        fullAddress: fullAddress,
-        genres: formatArray(genres, getUrlDetails),
-      };
-    }
-  );
-};
-
-const saveDataToFile = (filePath, data) => {
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
-  console.log("Data saved to:", filePath);
-};
-
-const readDataFromFile = (filePath) => {
-  console.log("Reading data from:", filePath);
-  return JSON.parse(fs.readFileSync(filePath));
-};
-
-const main = async () => {
-  try {
-    const browser = await playwright.chromium.launch({ headless: true });
-    const context = await browser.newContext();
-
-    const eventsFilePath = path.join(__dirname, "data.json");
-    // const allEvents = await getBasicEvents(eventsFilePath, context);
-
-    // Uncomment below to read from existing scraped data
-    const allEvents = readDataFromFile(eventsFilePath);
-    // console.log("Events:", allEvents);
-
-    console.log("Enriching events.", allEvents.length);
-
-    const enrichedFilePath = path.join(__dirname, "enrichedData.json");
-    const allEnrichedEvents = await getEnrichedEvents(
-      enrichedFilePath,
-      context,
-      allEvents
-    );
-
-    saveDataToFile(enrichedFilePath, allEnrichedEvents);
-
-    await browser.close();
-  } catch (error) {
-    console.error("Error:", error);
-    await new Promise((res) => setTimeout(res, 10000));
-    process.exit(1);
+async function main() {
+  const date = process.argv.find((arg) => arg.startsWith("--date="))?.slice(7);
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date) ||
+      Number.isNaN(Date.parse(date)) || new Date(date).toISOString().slice(0, 10) !== date) {
+    throw new Error("Supply the official event date, for example --date=2026-09-18.");
   }
-};
+  const year = Number(date.slice(0, 4));
+  const homepage = await fetchText("https://culturenight.ie/");
+  const officialDate = new Intl.DateTimeFormat("en-IE", {
+    day: "numeric", month: "long", year: "numeric", timeZone: "UTC",
+  }).format(new Date(date));
+  if (!homepage.includes(officialDate)) {
+    throw new Error(`The official homepage does not confirm ${officialDate}; refusing to relabel the programme.`);
+  }
 
-main();
+  const concurrency = Number(process.env.MAX_CONCURRENT || 3);
+  if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 8) {
+    throw new Error("MAX_CONCURRENT must be an integer between 1 and 8.");
+  }
+  const cacheDir = path.join(__dirname, ".scrape-cache", date);
+  fs.mkdirSync(cacheDir, { recursive: true });
+  const browser = await chromium.launch({
+    headless: true,
+    ...(process.env.BROWSER_CHANNEL ? { channel: process.env.BROWSER_CHANNEL } : {}),
+  });
+  try {
+    const context = await browser.newContext({ javaScriptEnabled: false });
+    // Parse source HTML without loading images, embeds, analytics, or page scripts.
+    await context.route("**/*", (route) => route.abort());
+    const pages = await Promise.all(Array.from({ length: concurrency }, () => context.newPage()));
+    const load = async (page, url, resume = false) => {
+      const cachePath = path.join(cacheDir, createHash("sha256").update(url).digest("hex") + ".html");
+      const html = resume && fs.existsSync(cachePath)
+        ? fs.readFileSync(cachePath, "utf8")
+        : await fetchText(url);
+      await page.setContent(html, { waitUntil: "domcontentloaded" });
+      return () => fs.writeFileSync(cachePath, html);
+    };
+    await load(pages[0], BASE_URL);
+    const first = await scrapeListing(pages[0]);
+    if (first.page !== 1) throw new Error("Expected the first listing page.");
+    const events = [...first.events];
+    for (let start = 2; start <= first.pages; start += concurrency) {
+      const numbers = Array.from({ length: Math.min(concurrency, first.pages - start + 1) }, (_, i) => start + i);
+      const batch = await Promise.all(numbers.map(async (number, i) => {
+        await load(pages[i], `${BASE_URL}?sf_paged=${number}`);
+        const listing = await scrapeListing(pages[i]);
+        if (listing.page !== number || listing.pages !== first.pages) {
+          throw new Error(`Pagination changed on page ${number}; rerun for a consistent listing.`);
+        }
+        return listing.events;
+      }));
+      events.push(...batch.flat());
+      console.log(`Listing ${numbers.at(-1)}/${first.pages}: ${events.length} events`);
+    }
+    validateEvents(events, false);
+    const enriched = [];
+    for (let start = 0; start < events.length; start += concurrency) {
+      const batch = await Promise.all(events.slice(start, start + concurrency).map(async (event, i) => {
+        try {
+          const cache = await load(pages[i], event.url, process.argv.includes("--resume"));
+          const detail = await scrapeEvent(pages[i]);
+          cache();
+          return { ...event, ...detail };
+        } catch (error) {
+          throw new Error(`Failed to scrape ${event.url}: ${error.message}`, { cause: error });
+        }
+      }));
+      enriched.push(...batch);
+      if (start % (concurrency * 10) === 0 || enriched.length === events.length) {
+        console.log(`Details ${enriched.length}/${events.length}`);
+      }
+    }
+    validateEvents(enriched, false);
+    saveJson(path.join(__dirname, "data.json"), events);
+    saveJson(path.join(__dirname, "enrichedData.json"), enriched);
+    saveJson(path.join(__dirname, "programme.json"), {
+      year, date, source: BASE_URL, fetchedAt: new Date().toISOString(),
+      listingPages: first.pages, eventCount: enriched.length,
+    });
+    console.log(`Scraped all ${enriched.length} events. Run npm run geocode to update the site dataset.`);
+  } finally {
+    await browser.close();
+  }
+}
+
+module.exports = { scrapeListing, scrapeEvent };
+if (require.main === module) {
+  main().catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
+}

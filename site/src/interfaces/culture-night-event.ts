@@ -21,5 +21,5 @@ export type CultureNightEvent = {
     venueName: string | null;
     fullAddress: string;
     genres: UrlWithTitle[],
-    geocode: Geocode,
+    geocode: Geocode | null,
 }

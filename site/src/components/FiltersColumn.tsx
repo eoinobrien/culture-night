@@ -227,7 +227,7 @@ export default function FiltersColumn({
           label="Age group"
           options={events
             .map((e) => e.ageGroup)
-            .filter((f) => f !== null)
+            .filter((f) => f !== null && f !== "")
             .filter((v, i, a) => a.indexOf(v) === i)
             .sort((a, b) => a.localeCompare(b))}
           filterValue={ageGroup}
