@@ -44,3 +44,57 @@ body {
 .leaflet-container .leaflet-control-attribution a {
   color: #00A8EC !important;
 }
+
+.event-popup .leaflet-popup-content-wrapper {
+  padding: 0;
+  overflow: hidden;
+}
+
+.event-popup .leaflet-popup-content {
+  width: var(--event-popup-width, min(360px, calc(100vw - 24px))) !important;
+  margin: 0;
+}
+
+.event-popup .event-details {
+  display: flex;
+  flex-direction: column;
+  max-height: var(--event-popup-height, 60dvh);
+}
+
+.event-popup .event-details-header {
+  flex-shrink: 0;
+  max-height: calc(var(--event-popup-height, 60dvh) * 0.4);
+  overflow: auto;
+  padding: 16px 48px 12px 16px;
+  border-bottom: 1px solid #4b5563;
+}
+
+.event-popup .event-details-body {
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 12px 16px 16px;
+}
+
+.event-details-header {
+  margin-bottom: 12px;
+}
+
+.leaflet-container .event-popup a.leaflet-popup-close-button {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  font-size: 24px;
+  color: #fff !important;
+  background: #000;
+  border-radius: 0 12px 0 0;
+}
+
+.event-popup a:focus-visible,
+.event-popup summary:focus-visible,
+.event-popup .event-details-header:focus-visible,
+.event-popup .event-details-body:focus-visible {
+  outline: 2px solid #00a8ec;
+  outline-offset: -2px;
+}

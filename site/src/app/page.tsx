@@ -1,171 +1,84 @@
 "use client";
 
 import { CultureNightEvent } from "@/interfaces/culture-night-event";
-
 import Events from "../api/events.json";
 import { programmeDate } from "@/api/programme";
 import dynamic from "next/dynamic";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Geocode } from "@/interfaces/geocode";
 import { Time } from "@/interfaces/time";
 import SearchBox from "@/components/SearchBox";
 import FiltersColumn from "@/components/FiltersColumn";
+import { availabilityError, filterEvents, searchEvents } from "@/lib/event-filters";
 
 const IrelandLatLng: Geocode = { lat: 53.4230965, lng: -7.9254405 };
-
-const adjustHoursPastMidnight = (hour: number): number => {
-  return hour < 15 ? hour + 24 : hour;
-};
-
-const compareTime = (a: Time, b: Time): number => {
-  const aHour = adjustHoursPastMidnight(a.hour);
-  const bHour = adjustHoursPastMidnight(b.hour);
-
-  if (aHour < bHour || (aHour === bHour && a.minute < b.minute)) {
-    return -1;
-  }
-
-  if (aHour === bHour && a.minute === b.minute) {
-    return 0;
-  }
-
-  return 1;
-};
-
-const filterEventByTime = (
-  filterStartTime: Time,
-  filterEndTime: Time,
-  event: CultureNightEvent
-): boolean => {
-  // filter: 15:00 - 16:00, event: 16:00 – 16:45 = hide
-  if (compareTime(filterEndTime, event.startTime) <= 0) {
-    return false;
-  }
-
-  // all events that occur inside filter
-  // filter: 15:00 - 16:00, event: 15:15 - 15:45 = show
-  if (
-    compareTime(filterStartTime, event.startTime) <= 0 &&
-    compareTime(filterEndTime, event.endTime) > 0
-  ) {
-    return true;
-  }
-
-  // all events that occur inside filter
-  // filter: 15:15 - 15:15, event: 15:00 - 16:00 = show
-  if (
-    compareTime(filterStartTime, event.startTime) >= 0 &&
-    compareTime(filterStartTime, event.endTime) < 0
-  ) {
-    return true;
-  }
-
-  return false;
-};
-
-const filterEventByStringFilter = (
-  filter: string,
-  eventValue: string
-): boolean => {
-  if (filter === "All") {
-    return true;
-  }
-
-  return filter === eventValue;
-};
+const events: CultureNightEvent[] = Events;
+const unmappedEventCount = events.filter((event) => event.geocode === null).length;
+const Map = dynamic(() => import("@/components/EventMap"), {
+  loading: () => <p>Map is loading</p>,
+  ssr: false,
+});
 
 export default function Home() {
-  const events: CultureNightEvent[] = Events;
-  const unmappedEventCount = events.filter((event) => event.geocode === null).length;
-
-  // const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
-  // const [selectedGenre, setSelectedGenre] = useState<string[]>([]);
   const [startTime, setStartTime] = useState<Time>({ hour: 15, minute: 0 });
   const [endTime, setEndTime] = useState<Time>({ hour: 3, minute: 0 });
-  const [eventType, setEventType] = useState<string>("All");
-  const [bookingDetails, setBookingDetails] = useState<string>("All");
-  const [ageGroup, setAgeGroup] = useState<string>("All");
+  const [eventType, setEventType] = useState("All");
+  const [bookingDetails, setBookingDetails] = useState("All");
+  const [ageGroup, setAgeGroup] = useState("All");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedUrl, setSelectedUrl] = useState<string>();
 
-  // search state
-  const [searchTerm, setSearchTerm] = useState<string>("");
-  const [selectedTitle, setSelectedTitle] = useState<string | undefined>(
-    undefined
+  const filteredEvents = useMemo(
+    () => filterEvents(events, { startTime, endTime, eventType, bookingDetails, ageGroup }),
+    [startTime, endTime, eventType, bookingDetails, ageGroup]
   );
+  const suggestions = useMemo(
+    () => searchEvents(filteredEvents, searchTerm),
+    [filteredEvents, searchTerm]
+  );
+  const selectedEvent = filteredEvents.find((event) => event.url === selectedUrl);
+  const timeError = availabilityError(startTime, endTime);
+  const searchMessage = timeError
+    ? undefined
+    : filteredEvents.length === 0
+      ? "No events match these filters."
+      : searchTerm.trim() && suggestions.length === 0
+        ? "No matching events. Try another search or change the filters."
+        : undefined;
 
-  // autocomplete UI state
-  const [showSuggestions, setShowSuggestions] = useState<boolean>(false);
-  const [activeIndex, setActiveIndex] = useState<number>(-1);
+  useEffect(() => {
+    if (selectedUrl && !selectedEvent) setSelectedUrl(undefined);
+  }, [selectedUrl, selectedEvent]);
 
-  // flexible search matcher: matches title, locations, genres, venueName, address, description, host, eventType, ageGroup
-  const matchEvent = (ev: CultureNightEvent, term: string) => {
-    const t = term.toLowerCase();
-    if (!t) return false;
-    if ((ev.title || "").toLowerCase().includes(t)) return true;
-    if (ev.venueName && ev.venueName.toLowerCase().includes(t)) return true;
-    if (ev.fullAddress && ev.fullAddress.toLowerCase().includes(t)) return true;
-    if (ev.host && ev.host.toLowerCase().includes(t)) return true;
-    if (
-      ev.locations &&
-      ev.locations.some((l) => l.title.toLowerCase().includes(t))
-    )
-      return true;
-    if (ev.genres && ev.genres.some((g) => g.title.toLowerCase().includes(t)))
-      return true;
-    return false;
+  const closeEvent = useCallback((url: string) => {
+    setSelectedUrl((current) => current === url ? undefined : current);
+  }, []);
+
+  const changeSearch = (value: string) => {
+    setSearchTerm(value);
+    setSelectedUrl(undefined);
   };
-
-  // live suggestions computed from searchTerm
-  const suggestions = useMemo(() => {
-    const term = searchTerm.trim();
-
-    const filterEvents = events.filter(
-      (e) =>
-        filterEventByTime(startTime, endTime, e) &&
-        filterEventByStringFilter(eventType, e.eventType) &&
-        filterEventByStringFilter(bookingDetails, e.bookingDetails) &&
-        filterEventByStringFilter(ageGroup, e.ageGroup)
-    );
-
-    if (!term) return filterEvents.map((e) => e.title);
-    return (
-      filterEvents
-        .filter((e) => matchEvent(e, term))
-        .map((e) => e.title)
-        // remove duplicates
-        .filter((v, i, a) => a.indexOf(v) === i)
-    );
-  }, [events, searchTerm, startTime, endTime, eventType, bookingDetails, ageGroup]);
-
-  const selectedEvent = selectedTitle
-    ? events.find((e) => e.title === selectedTitle)
-    : undefined;
-
   const runSearch = () => {
-    const term = searchTerm.trim();
-    if (!term) return;
-    const found = events.find((e) => matchEvent(e, term));
-    if (found) setSelectedTitle(found.title);
+    if (searchTerm.trim()) setSelectedUrl(suggestions[0]?.url);
   };
-
-  const selectSuggestion = (title: string) => {
-    setSearchTerm(title);
-    setShowSuggestions(false);
-    setActiveIndex(-1);
-    // select immediately
-    setSelectedTitle(title);
+  const selectSuggestion = (event: CultureNightEvent) => {
+    setSearchTerm(event.title);
+    setSelectedUrl(event.url);
   };
-
-  const Map = useMemo(
-    () =>
-      dynamic(() => import("@/components/EventMap"), {
-        loading: () => <p>Map is loading</p>,
-        ssr: false,
-      }),
-    []
-  );
+  const clearSearch = () => {
+    setSearchTerm("");
+    setSelectedUrl(undefined);
+  };
+  const resetFilters = () => {
+    setStartTime({ hour: 15, minute: 0 });
+    setEndTime({ hour: 3, minute: 0 });
+    setEventType("All");
+    setBookingDetails("All");
+    setAgeGroup("All");
+  };
 
   return (
-    <div className="max-h-svh">
+    <main className="max-h-svh">
       <div className="mx-auto lg:flex lg:flex-shrink-1 lg:max-w-none">
         <div className="p-4 sm:p-6 lg:w-[30%]">
           <div className="mb-8">
@@ -181,16 +94,13 @@ export default function Home() {
 
           <SearchBox
             searchTerm={searchTerm}
-            setSearchTerm={setSearchTerm}
-            showSuggestions={showSuggestions}
-            setShowSuggestions={setShowSuggestions}
-            activeIndex={activeIndex}
-            setActiveIndex={setActiveIndex}
+            setSearchTerm={changeSearch}
             suggestions={suggestions}
             selectSuggestion={selectSuggestion}
             runSearch={runSearch}
-            setSelectedTitle={(t) => setSelectedTitle(t)}
+            clearSearch={clearSearch}
             selectedEvent={selectedEvent}
+            message={searchMessage}
           />
           <FiltersColumn
             startTime={startTime}
@@ -205,6 +115,12 @@ export default function Home() {
             setAgeGroup={setAgeGroup}
             events={events}
           />
+          {timeError && <p role="alert" className="mb-3 text-red-300">{timeError}</p>}
+          {(timeError || filteredEvents.length === 0) && (
+            <button type="button" onClick={resetFilters} className="rounded bg-gray-700 px-3 py-2">
+              Reset filters
+            </button>
+          )}
         </div>
         <div className="h-2 w-screen lg:w-2 lg:h-screen bg-gradient-to-r lg:bg-gradient-to-b from-[#00893e] via-[#ffa300] to-[#ff0000]"></div>
         <div className="lg:mt-0 lg:w-[70%] lg:flex-shrink-1">
@@ -212,18 +128,14 @@ export default function Home() {
             <Map
               position={IrelandLatLng}
               zoom={7}
-              events={events.filter(
-                (e) =>
-                  filterEventByTime(startTime, endTime, e) &&
-                  filterEventByStringFilter(eventType, e.eventType) &&
-                  filterEventByStringFilter(bookingDetails, e.bookingDetails) &&
-                  filterEventByStringFilter(ageGroup, e.ageGroup)
-              )}
-              selectedTitle={selectedTitle}
+              events={filteredEvents}
+              selectedUrl={selectedEvent?.url}
+              onSelect={setSelectedUrl}
+              onClose={closeEvent}
             />
           </div>
         </div>
       </div>
-    </div>
+    </main>
   );
 }
