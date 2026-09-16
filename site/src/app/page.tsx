@@ -3,6 +3,7 @@
 import { CultureNightEvent } from "@/interfaces/culture-night-event";
 
 import Events from "../api/events.json";
+import { programmeDate } from "@/api/programme";
 import dynamic from "next/dynamic";
 import { useMemo, useState } from "react";
 import { Geocode } from "@/interfaces/geocode";
@@ -74,7 +75,8 @@ const filterEventByStringFilter = (
 };
 
 export default function Home() {
-  const events = Events as CultureNightEvent[];
+  const events: CultureNightEvent[] = Events;
+  const unmappedEventCount = events.filter((event) => event.geocode === null).length;
 
   // const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
   // const [selectedGenre, setSelectedGenre] = useState<string[]>([]);
@@ -168,7 +170,13 @@ export default function Home() {
         <div className="p-4 sm:p-6 lg:w-[30%]">
           <div className="mb-8">
             <h1 className="text-3xl font-bold tracking-tight">Culture Night</h1>
-            <h2 className="text-sm">September 19th, 2025</h2>
+            <h2 className="text-sm">{programmeDate}</h2>
+            {unmappedEventCount > 0 && (
+              <p className="mt-2 text-sm">
+                {unmappedEventCount} events have no map location. You can still find
+                their details using search.
+              </p>
+            )}
           </div>
 
           <SearchBox

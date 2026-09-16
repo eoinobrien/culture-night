@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import { programmeDate, programmeYear } from "@/api/programme";
 import "./globals.css";
 
 const geistSans = localFont({
@@ -14,8 +15,8 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Culture Night 2025 Map",
-  description: "Map for Culture Night 2025 events. Taking place on September 19th, 2025.",
+  title: `Culture Night ${programmeYear} Map`,
+  description: `Map for Culture Night ${programmeYear} events. Taking place on ${programmeDate}.`,
 };
 
 export default function RootLayout({

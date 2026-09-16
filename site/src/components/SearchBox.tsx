@@ -147,6 +147,17 @@ export default function SearchBox({
                 {selectedEvent.venueName}
               </div>
             )}
+            {selectedEvent.geocode === null && (
+              <div className="text-xs text-gray-400">No map location available</div>
+            )}
+            <a
+              href={selectedEvent.url}
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs underline"
+            >
+              Culture Night Event Page
+            </a>
           </div>
           <button
             aria-label="Clear selection"
