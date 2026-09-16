@@ -1,4 +1,3 @@
-import React, { Dispatch, SetStateAction } from "react";
 import MapFilter from "@/components/MapFilter";
 import { Time } from "@/interfaces/time";
 import { CultureNightEvent } from "@/interfaces/culture-night-event";
@@ -9,237 +8,47 @@ interface Props {
   setStartTime: (t: Time) => void;
   setEndTime: (t: Time) => void;
   eventType: string;
-  setEventType: Dispatch<SetStateAction<string>>;
+  setEventType: (value: string) => void;
   bookingDetails: string;
-  setBookingDetails: Dispatch<SetStateAction<string>>;
+  setBookingDetails: (value: string) => void;
   ageGroup: string;
-  setAgeGroup: Dispatch<SetStateAction<string>>;
+  setAgeGroup: (value: string) => void;
   events: CultureNightEvent[];
 }
 
+const timeOptions = Array.from({ length: 49 }, (_, index) => {
+  const minutes = (15 * 60 + index * 15) % (24 * 60);
+  return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+});
+const timeString = (time: Time) =>
+  `${String(time.hour).padStart(2, "0")}:${String(time.minute).padStart(2, "0")}`;
+const parseTime = (value: string): Time => {
+  const [hour, minute] = value.split(":").map(Number);
+  return { hour, minute };
+};
+
 export default function FiltersColumn({
-  startTime,
-  endTime,
-  setStartTime,
-  setEndTime,
-  eventType,
-  setEventType,
-  bookingDetails,
-  setBookingDetails,
-  ageGroup,
-  setAgeGroup,
-  events,
+  startTime, endTime, setStartTime, setEndTime, eventType, setEventType,
+  bookingDetails, setBookingDetails, ageGroup, setAgeGroup, events,
 }: Props) {
-  const parseTimeToString = (time: Time): string => {
-    return `${time.hour.toLocaleString("en-IE", {
-      minimumIntegerDigits: 2,
-      useGrouping: false,
-    })}:${time.minute.toLocaleString("en-IE", {
-      minimumIntegerDigits: 2,
-      useGrouping: false,
-    })}`;
-  };
-
-  const stringToTime = (str: string): Time => {
-    return {
-      hour: Number(str.split(":")[0]),
-      minute: Number(str.split(":")[1]),
-    };
-  };
-
   return (
-    <div>
-      <div className="flex items-center justify-between mb-2">
-        <h3 className="text-xl font-bold tracking-tight">Filters</h3>
-      </div>
-      <p id="availability-help" className="mb-4 text-sm text-gray-300">
-        Shows events overlapping any part of your availability. Check event
-        details for fixed start times and admission rules.
+    <div className="filter-fields">
+      <p id="availability-help" className="filter-help">
+        Events overlapping your availability, including after midnight.
+        Check each event for fixed start times and admission rules.
       </p>
-      <div>
-        <div className="flex items-center mb-4">
-          <div className="w-1/3 md:w-1/4">
-            <label
-              className="block text-gray-300 font-bold text-right mb-1 md:mb-0 pr-4"
-              htmlFor="inline-start-time"
-            >
-              Available from
-            </label>
-          </div>
-          <div className="relative grow">
-            <select
-              className="block appearance-none w-full bg-gray-700 border border-gray-800 text-gray-200 py-3 px-4 pr-8 rounded leading-tight focus:outline-none focus:bg-gray-600 focus:border-gray-500"
-              id="inline-start-time"
-              aria-describedby="availability-help"
-              value={parseTimeToString(startTime)}
-              onChange={(e) => setStartTime(stringToTime(e.target.value))}
-            >
-              <option>15:00</option>
-              <option>15:15</option>
-              <option>15:30</option>
-              <option>15:45</option>
-              <option>16:00</option>
-              <option>16:15</option>
-              <option>16:30</option>
-              <option>16:45</option>
-              <option>17:00</option>
-              <option>17:15</option>
-              <option>17:30</option>
-              <option>17:45</option>
-              <option>18:00</option>
-              <option>18:15</option>
-              <option>18:30</option>
-              <option>18:45</option>
-              <option>19:00</option>
-              <option>19:15</option>
-              <option>19:30</option>
-              <option>19:45</option>
-              <option>20:00</option>
-              <option>20:15</option>
-              <option>20:30</option>
-              <option>20:45</option>
-              <option>21:00</option>
-              <option>21:15</option>
-              <option>21:30</option>
-              <option>21:45</option>
-              <option>22:00</option>
-              <option>22:15</option>
-              <option>22:30</option>
-              <option>22:45</option>
-              <option>23:00</option>
-              <option>23:15</option>
-              <option>23:30</option>
-              <option>23:45</option>
-              <option>00:00</option>
-              <option>00:15</option>
-              <option>00:30</option>
-              <option>00:45</option>
-              <option>01:00</option>
-              <option>01:15</option>
-              <option>01:30</option>
-              <option>01:45</option>
-              <option>02:00</option>
-              <option>02:15</option>
-              <option>02:30</option>
-              <option>02:45</option>
-              <option>03:00</option>
-            </select>
-            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-200">
-              <svg
-                className="fill-current h-4 w-4"
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 20 20"
-              >
-                <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
-              </svg>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center mb-4">
-          <div className="w-1/3 md:w-1/4">
-            <label
-              className="block text-gray-300 font-bold text-right mb-1 md:mb-0 pr-4"
-              htmlFor="inline-end-time"
-            >
-              Available until
-            </label>
-          </div>
-          <div className="relative grow">
-            <select
-              className="block appearance-none w-full bg-gray-700 border border-gray-800 text-gray-200 py-3 px-4 pr-8 rounded leading-tight focus:outline-none focus:bg-gray-600 focus:border-gray-500"
-              id="inline-end-time"
-              aria-describedby="availability-help"
-              value={parseTimeToString(endTime)}
-              onChange={(e) => setEndTime(stringToTime(e.target.value))}
-            >
-              <option>15:00</option>
-              <option>15:15</option>
-              <option>15:30</option>
-              <option>15:45</option>
-              <option>16:00</option>
-              <option>16:15</option>
-              <option>16:30</option>
-              <option>16:45</option>
-              <option>17:00</option>
-              <option>17:15</option>
-              <option>17:30</option>
-              <option>17:45</option>
-              <option>18:00</option>
-              <option>18:15</option>
-              <option>18:30</option>
-              <option>18:45</option>
-              <option>19:00</option>
-              <option>19:15</option>
-              <option>19:30</option>
-              <option>19:45</option>
-              <option>20:00</option>
-              <option>20:15</option>
-              <option>20:30</option>
-              <option>20:45</option>
-              <option>21:00</option>
-              <option>21:15</option>
-              <option>21:30</option>
-              <option>21:45</option>
-              <option>22:00</option>
-              <option>22:15</option>
-              <option>22:30</option>
-              <option>22:45</option>
-              <option>23:00</option>
-              <option>23:15</option>
-              <option>23:30</option>
-              <option>23:45</option>
-              <option>00:00</option>
-              <option>00:15</option>
-              <option>00:30</option>
-              <option>00:45</option>
-              <option>01:00</option>
-              <option>01:15</option>
-              <option>01:30</option>
-              <option>01:45</option>
-              <option>02:00</option>
-              <option>02:15</option>
-              <option>02:30</option>
-              <option>02:45</option>
-              <option>03:00</option>
-            </select>
-            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-200">
-              <svg
-                className="fill-current h-4 w-4"
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 20 20"
-              >
-                <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
-              </svg>
-            </div>
-          </div>
-        </div>
-
-        <MapFilter
-          label="Event type"
-          options={events.map((e) => e.eventType)}
-          filterValue={eventType}
-          setFilter={setEventType}
-        />
-
-        <MapFilter
-          label="Booking details"
-          options={events.map((e) => e.bookingDetails)}
-          filterValue={bookingDetails}
-          setFilter={setBookingDetails}
-        />
-
-        <MapFilter
-          label="Age group"
-          options={events
-            .map((e) => e.ageGroup)
-            .filter((f) => f !== null && f !== "")
-            .filter((v, i, a) => a.indexOf(v) === i)
-            .sort((a, b) => a.localeCompare(b))}
-          filterValue={ageGroup}
-          setFilter={setAgeGroup}
-        />
+      <div className="availability-fields">
+        <MapFilter label="Available from" options={timeOptions} filterValue={timeString(startTime)}
+          setFilter={(value) => setStartTime(parseTime(value))} includeAll={false} describedBy="availability-help" />
+        <MapFilter label="Available until" options={timeOptions} filterValue={timeString(endTime)}
+          setFilter={(value) => setEndTime(parseTime(value))} includeAll={false} describedBy="availability-help" />
       </div>
+      <MapFilter label="Event type" options={events.map((event) => event.eventType)}
+        filterValue={eventType} setFilter={setEventType} />
+      <MapFilter label="Booking details" options={events.map((event) => event.bookingDetails)}
+        filterValue={bookingDetails} setFilter={setBookingDetails} />
+      <MapFilter label="Age group" options={events.map((event) => event.ageGroup).filter(Boolean).sort((a, b) => a.localeCompare(b))}
+        filterValue={ageGroup} setFilter={setAgeGroup} />
     </div>
   );
 }

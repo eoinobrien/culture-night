@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { CultureNightEvent } from "@/interfaces/culture-night-event";
-import PopupEventDetails from "./PopupEventDetails";
+import { MagnifyingGlassIcon, XMarkIcon } from "@heroicons/react/24/outline";
 
 interface Props {
   searchTerm: string;
@@ -9,20 +9,19 @@ interface Props {
   selectSuggestion: (event: CultureNightEvent) => void;
   runSearch: () => void;
   clearSearch: () => void;
-  selectedEvent?: CultureNightEvent;
-  message?: string;
+  hasSelection?: boolean;
 }
 
 export default function SearchBox({
   searchTerm, setSearchTerm, suggestions, selectSuggestion, runSearch,
-  clearSearch, selectedEvent, message,
+  clearSearch, hasSelection,
 }: Props) {
   const listId = useId();
   const listRef = useRef<HTMLUListElement>(null);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const visibleSuggestions = suggestions.slice(0, 20);
-  const isOpen = showSuggestions && visibleSuggestions.length > 0;
+  const isOpen = showSuggestions && Boolean(searchTerm.trim()) && visibleSuggestions.length > 0;
   const activeOption = isOpen && activeIndex >= 0 && activeIndex < visibleSuggestions.length
     ? `${listId}-${activeIndex}` : undefined;
 
@@ -45,11 +44,12 @@ export default function SearchBox({
   };
 
   return (
-    <div className="mb-6">
-      <label htmlFor="event-search" className="block text-gray-300 font-bold mb-1">
+    <div className="search-box">
+      <label htmlFor="event-search" className="sr-only">
         Search events
       </label>
-      <div className="relative">
+      <div className="search-field">
+        <MagnifyingGlassIcon className="search-icon" aria-hidden="true" />
         <input
           id="event-search"
           role="combobox"
@@ -57,7 +57,7 @@ export default function SearchBox({
           aria-expanded={isOpen}
           aria-controls={isOpen ? listId : undefined}
           aria-activedescendant={activeOption}
-          className="w-full bg-gray-700 border border-gray-800 text-gray-200 py-2 pl-3 pr-16 rounded placeholder-gray-400"
+          className="search-input"
           placeholder="Search events, places or venues"
           value={searchTerm}
           onChange={(e) => {
@@ -89,10 +89,24 @@ export default function SearchBox({
           onFocus={() => setShowSuggestions(true)}
           onBlur={() => setShowSuggestions(false)}
         />
+        {(searchTerm || hasSelection) && (
+          <button
+            type="button"
+            className="search-clear icon-button"
+            aria-label="Clear search and selection"
+            onClick={() => {
+              clearSearch();
+              setShowSuggestions(false);
+              setActiveIndex(-1);
+            }}
+          >
+            <XMarkIcon aria-hidden="true" />
+          </button>
+        )}
         <button
           type="button"
-          aria-label="Go to event"
-          className="absolute right-1 top-1 bottom-1 px-3 bg-green-600 hover:bg-green-700 text-white rounded focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-green-400"
+          aria-label="Show matching events"
+          className="search-submit"
           onClick={submit}
         >
           Go
@@ -103,7 +117,7 @@ export default function SearchBox({
             ref={listRef}
             role="listbox"
             aria-label="Matching events"
-            className="absolute z-50 mt-1 max-h-48 w-full overflow-auto rounded bg-gray-800 border border-gray-700"
+            className="search-suggestions"
           >
             {visibleSuggestions.map((event, index) => {
               const match = event.title.toLowerCase().indexOf(searchTerm.trim().toLowerCase());
@@ -114,7 +128,7 @@ export default function SearchBox({
                   key={event.url}
                   role="option"
                   aria-selected={activeIndex === index}
-                  className={`px-3 py-2 cursor-pointer hover:bg-gray-700 whitespace-normal break-words ${activeIndex === index ? "bg-gray-700" : ""}`}
+                  className="search-suggestion"
                   onMouseDown={(e) => {
                     e.preventDefault();
                     choose(event);
@@ -124,11 +138,11 @@ export default function SearchBox({
                   {match < 0 || !length ? event.title : (
                     <>
                       {event.title.slice(0, match)}
-                      <span className="bg-yellow-600 text-black">{event.title.slice(match, match + length)}</span>
+                      <mark>{event.title.slice(match, match + length)}</mark>
                       {event.title.slice(match + length)}
                     </>
                   )}
-                  <span className="block text-xs text-gray-400">
+                  <span className="suggestion-meta">
                     {[event.venueName || event.host, event.time].filter(Boolean).join(" - ")}
                   </span>
                 </li>
@@ -137,38 +151,6 @@ export default function SearchBox({
           </ul>
         )}
       </div>
-      {message && <p role="status" className="mt-3 text-sm">{message}</p>}
-      {(searchTerm || selectedEvent) && (
-        <button
-          type="button"
-          className="mt-2 rounded bg-gray-600 px-3 py-2 text-sm"
-          onClick={() => {
-            clearSearch();
-            setShowSuggestions(false);
-            setActiveIndex(-1);
-          }}
-        >
-          Clear search and selection
-        </button>
-      )}
-      {selectedEvent && (
-        <section aria-label="Selected event" className="mt-3 rounded bg-gray-800 px-3 py-2">
-          {selectedEvent.geocode === null ? (
-            <>
-              <p className="mb-2 text-sm text-gray-300">No map location available</p>
-              <PopupEventDetails event={selectedEvent} />
-            </>
-          ) : (
-            <div className="text-sm">
-              <h2 className="font-semibold break-words">{selectedEvent.title}</h2>
-              {selectedEvent.venueName && <p className="text-xs text-gray-400">{selectedEvent.venueName}</p>}
-              <a href={selectedEvent.url} target="_blank" rel="noreferrer" className="text-xs underline">
-                Culture Night Event Page
-              </a>
-            </div>
-          )}
-        </section>
-      )}
     </div>
   );
 }

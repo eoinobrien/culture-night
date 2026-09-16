@@ -4,18 +4,19 @@ import { CultureNightEvent } from "@/interfaces/culture-night-event";
 import Events from "../api/events.json";
 import { programmeDate } from "@/api/programme";
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Geocode } from "@/interfaces/geocode";
 import { Time } from "@/interfaces/time";
 import SearchBox from "@/components/SearchBox";
 import FiltersColumn from "@/components/FiltersColumn";
+import EventResults from "@/components/EventResults";
+import { AdjustmentsHorizontalIcon, ListBulletIcon, MapIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { availabilityError, filterEvents, searchEvents } from "@/lib/event-filters";
 
 const IrelandLatLng: Geocode = { lat: 53.4230965, lng: -7.9254405 };
 const events: CultureNightEvent[] = Events;
-const unmappedEventCount = events.filter((event) => event.geocode === null).length;
 const Map = dynamic(() => import("@/components/EventMap"), {
-  loading: () => <p>Map is loading</p>,
+  loading: () => <p role="status" className="map-loading">Loading the event map...</p>,
   ssr: false,
 });
 
@@ -27,28 +28,32 @@ export default function Home() {
   const [ageGroup, setAgeGroup] = useState("All");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedUrl, setSelectedUrl] = useState<string>();
+  const [view, setView] = useState<"list" | "map">("list");
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const filterButton = useRef<HTMLButtonElement>(null);
+  const resultsPanel = useRef<HTMLDivElement>(null);
 
   const filteredEvents = useMemo(
     () => filterEvents(events, { startTime, endTime, eventType, bookingDetails, ageGroup }),
     [startTime, endTime, eventType, bookingDetails, ageGroup]
   );
-  const suggestions = useMemo(
+  const matchingEvents = useMemo(
     () => searchEvents(filteredEvents, searchTerm),
     [filteredEvents, searchTerm]
   );
-  const selectedEvent = filteredEvents.find((event) => event.url === selectedUrl);
+  const selectedEvent = matchingEvents.find((event) => event.url === selectedUrl);
   const timeError = availabilityError(startTime, endTime);
-  const searchMessage = timeError
-    ? undefined
-    : filteredEvents.length === 0
-      ? "No events match these filters."
-      : searchTerm.trim() && suggestions.length === 0
-        ? "No matching events. Try another search or change the filters."
-        : undefined;
+  const activeFilters = [
+    startTime.hour !== 15 || startTime.minute !== 0 || endTime.hour !== 3 || endTime.minute !== 0,
+    eventType !== "All", bookingDetails !== "All", ageGroup !== "All",
+  ].filter(Boolean).length;
+  const unmappedEventCount = matchingEvents.filter((event) => !event.geocode).length;
+  const resultKey = JSON.stringify([searchTerm, startTime, endTime, eventType, bookingDetails, ageGroup]);
 
   useEffect(() => {
     if (selectedUrl && !selectedEvent) setSelectedUrl(undefined);
   }, [selectedUrl, selectedEvent]);
+  useEffect(() => { resultsPanel.current?.scrollTo({ top: 0 }); }, [resultKey]);
 
   const closeEvent = useCallback((url: string) => {
     setSelectedUrl((current) => current === url ? undefined : current);
@@ -59,11 +64,14 @@ export default function Home() {
     setSelectedUrl(undefined);
   };
   const runSearch = () => {
-    if (searchTerm.trim()) setSelectedUrl(suggestions[0]?.url);
+    setView("list");
+    setSelectedUrl(undefined);
+    resultsPanel.current?.scrollTo({ top: 0 });
   };
   const selectSuggestion = (event: CultureNightEvent) => {
-    setSearchTerm(event.title);
     setSelectedUrl(event.url);
+    setView(event.geocode ? "map" : "list");
+    if (!event.geocode) resultsPanel.current?.scrollTo({ top: 0 });
   };
   const clearSearch = () => {
     setSearchTerm("");
@@ -76,65 +84,141 @@ export default function Home() {
     setBookingDetails("All");
     setAgeGroup("All");
   };
+  const closeFilters = () => {
+    setFiltersOpen(false);
+    filterButton.current?.focus();
+  };
 
   return (
-    <main className="max-h-svh">
-      <div className="mx-auto lg:flex lg:flex-shrink-1 lg:max-w-none">
-        <div className="p-4 sm:p-6 lg:w-[30%]">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold tracking-tight">Culture Night</h1>
-            <h2 className="text-sm">{programmeDate}</h2>
-            {unmappedEventCount > 0 && (
-              <p className="mt-2 text-sm">
-                {unmappedEventCount} events have no map location. You can still find
-                their details using search.
-              </p>
+    <main className="culture-app">
+      <header className="app-header">
+        <h1>Culture Night</h1>
+        <p>{programmeDate}</p>
+      </header>
+      <div className={`discovery-workspace ${view}-view`}>
+        <section className="discovery-sidebar" aria-label="Find events">
+          <div className="discovery-controls">
+            <SearchBox
+              searchTerm={searchTerm}
+              setSearchTerm={changeSearch}
+              suggestions={matchingEvents}
+              selectSuggestion={selectSuggestion}
+              runSearch={runSearch}
+              clearSearch={clearSearch}
+              hasSelection={Boolean(selectedEvent)}
+            />
+            <div className="discovery-toolbar">
+              <button
+                type="button"
+                ref={filterButton}
+                className="filter-toggle"
+                aria-expanded={filtersOpen}
+                aria-controls="event-filters"
+                onClick={() => setFiltersOpen(!filtersOpen)}
+              >
+                <AdjustmentsHorizontalIcon aria-hidden="true" />
+                Filters {activeFilters > 0 && <span className="filter-count">{activeFilters}</span>}
+              </button>
+              <div className="view-switch" role="group" aria-label="Results view">
+                <button type="button" aria-pressed={view === "list"} onClick={() => setView("list")}>
+                  <ListBulletIcon aria-hidden="true" /> List
+                </button>
+                <button type="button" aria-pressed={view === "map"} onClick={() => setView("map")}>
+                  <MapIcon aria-hidden="true" /> Map
+                </button>
+              </div>
+              <span className="scope-label">All Ireland</span>
+            </div>
+            <div className="results-heading">
+              <h2 role="status" aria-live="polite" aria-atomic="true">
+                {matchingEvents.length.toLocaleString("en-IE")} {matchingEvents.length === 1 ? "event" : "events"}
+              </h2>
+              <span>{searchTerm.trim() ? "Matching your search" : "Across Ireland"}</span>
+            </div>
+            {filtersOpen && (
+              <section
+                id="event-filters"
+                aria-label="Event filters"
+                className="filter-panel"
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") {
+                    event.stopPropagation();
+                    closeFilters();
+                  }
+                }}
+              >
+                <div className="filter-panel-heading">
+                  <h2>Filter events</h2>
+                  <button type="button" className="icon-button" aria-label="Close filters" onClick={closeFilters}>
+                    <XMarkIcon aria-hidden="true" />
+                  </button>
+                </div>
+                <FiltersColumn
+                  startTime={startTime}
+                  endTime={endTime}
+                  setStartTime={setStartTime}
+                  setEndTime={setEndTime}
+                  eventType={eventType}
+                  setEventType={setEventType}
+                  bookingDetails={bookingDetails}
+                  setBookingDetails={setBookingDetails}
+                  ageGroup={ageGroup}
+                  setAgeGroup={setAgeGroup}
+                  events={events}
+                />
+                {timeError && <p role="alert" className="filter-error">{timeError}</p>}
+                <div className="filter-panel-actions">
+                  <button type="button" className="text-button" onClick={resetFilters}>Reset filters</button>
+                  <button type="button" className="primary-button" onClick={closeFilters}>
+                    Show {matchingEvents.length.toLocaleString("en-IE")} events
+                  </button>
+                </div>
+              </section>
             )}
           </div>
-
-          <SearchBox
-            searchTerm={searchTerm}
-            setSearchTerm={changeSearch}
-            suggestions={suggestions}
-            selectSuggestion={selectSuggestion}
-            runSearch={runSearch}
-            clearSearch={clearSearch}
-            selectedEvent={selectedEvent}
-            message={searchMessage}
-          />
-          <FiltersColumn
-            startTime={startTime}
-            endTime={endTime}
-            setStartTime={setStartTime}
-            setEndTime={setEndTime}
-            eventType={eventType}
-            setEventType={setEventType}
-            bookingDetails={bookingDetails}
-            setBookingDetails={setBookingDetails}
-            ageGroup={ageGroup}
-            setAgeGroup={setAgeGroup}
-            events={events}
-          />
-          {timeError && <p role="alert" className="mb-3 text-red-300">{timeError}</p>}
-          {(timeError || filteredEvents.length === 0) && (
-            <button type="button" onClick={resetFilters} className="rounded bg-gray-700 px-3 py-2">
-              Reset filters
+          <div className="results-panel" ref={resultsPanel}>
+            <EventResults
+              key={resultKey}
+              events={matchingEvents}
+              selectedEvent={selectedEvent}
+              onSelect={selectSuggestion}
+              onClose={closeEvent}
+              onClear={clearSearch}
+              onReset={resetFilters}
+              timeError={timeError}
+            />
+            <p className="programme-note">
+              {events.length.toLocaleString("en-IE")} events in the programme.
+              Check official listings for updates and admission details.
+            </p>
+          </div>
+        </section>
+        <section className="map-panel" aria-label="Event map">
+          <div className="map-caption">
+            <span>All Ireland</span>
+            <span>Select a pin to see an event</span>
+          </div>
+          {matchingEvents.length === 0 && (
+            <div className="map-empty" role="status">
+              <strong>{timeError || "No events match your search and filters."}</strong>
+              <button type="button" className="text-button" onClick={clearSearch}>Clear search</button>
+              <button type="button" className="text-button" onClick={resetFilters}>Reset filters</button>
+            </div>
+          )}
+          {unmappedEventCount > 0 && (
+            <button type="button" className="unmapped-notice" onClick={() => setView("list")}>
+              {unmappedEventCount} events have no map location. View them in the list.
             </button>
           )}
-        </div>
-        <div className="h-2 w-screen lg:w-2 lg:h-screen bg-gradient-to-r lg:bg-gradient-to-b from-[#00893e] via-[#ffa300] to-[#ff0000]"></div>
-        <div className="lg:mt-0 lg:w-[70%] lg:flex-shrink-1">
-          <div className="text-center lg:flex lg:flex-col lg:justify-center">
-            <Map
-              position={IrelandLatLng}
-              zoom={7}
-              events={filteredEvents}
-              selectedUrl={selectedEvent?.url}
-              onSelect={setSelectedUrl}
-              onClose={closeEvent}
-            />
-          </div>
-        </div>
+          <Map
+            position={IrelandLatLng}
+            zoom={7}
+            events={matchingEvents}
+            selectedUrl={selectedEvent?.url}
+            onSelect={setSelectedUrl}
+            onClose={closeEvent}
+          />
+        </section>
       </div>
     </main>
   );

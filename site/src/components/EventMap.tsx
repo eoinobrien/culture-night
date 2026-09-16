@@ -22,19 +22,54 @@ type EventMapProps = {
   onClose: (url: string) => void;
 };
 
-function createIcon(color: string) {
-  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='25' height='41' viewBox='0 0 25 41'>
-    <path d='M12.5 0C7 0 2.5 4.5 2.5 10c0 8.3 10 21 10 21s10-12.7 10-21C22.5 4.5 18 0 12.5 0z' fill='${color}' stroke='#ffffff' stroke-width='1'/>
+function createIcon(selected: boolean) {
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='44' height='44' viewBox='0 0 44 44'>
+    <circle cx='22' cy='22' r='19' fill='${selected ? "#ffffff" : "#c6f1a1"}' stroke='${selected ? "#c6f1a1" : "#141414"}' stroke-width='3'/>
+    <path d='M22 12a7 7 0 0 0-7 7c0 5 7 12 7 12s7-7 7-12a7 7 0 0 0-7-7z' fill='none' stroke='#172113' stroke-width='1.8'/>
+    <circle cx='22' cy='19' r='2' fill='#172113'/>
   </svg>`;
   return new L.Icon({
     iconUrl: "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(svg),
-    iconSize: [25, 41],
-    iconAnchor: [12, 41],
-    popupAnchor: [1, -34],
+    iconSize: [44, 44],
+    iconAnchor: [22, 22],
+    popupAnchor: [0, -18],
   });
 }
-const normalIcon = createIcon("#2880c9");
-const selectedIcon = createIcon("#fe9a00");
+const normalIcon = createIcon(false);
+const selectedIcon = createIcon(true);
+const clusterIcon = (cluster: L.MarkerCluster) => L.divIcon({
+  html: `<span aria-label="${cluster.getChildCount()} events. Zoom in.">${cluster.getChildCount()}</span>`,
+  className: "event-cluster",
+  iconSize: [44, 44],
+});
+
+function FitResults({ events, selectedUrl }: Pick<EventMapProps, "events" | "selectedUrl">) {
+  const map = useMap();
+  const fittedEvents = useRef<CultureNightEvent[] | null>(null);
+  useEffect(() => {
+    if (selectedUrl || fittedEvents.current === events) return;
+    const container = map.getContainer();
+    const points = events.flatMap((event) => event.geocode ? [L.latLng(event.geocode)] : []);
+    let frame = 0;
+    const fit = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        if (!container.clientWidth || !container.clientHeight || fittedEvents.current === events) return;
+        map.invalidateSize({ pan: false });
+        if (points.length) map.fitBounds(L.latLngBounds(points), { padding: [44, 56], maxZoom: 14, animate: false });
+        fittedEvents.current = events;
+      });
+    };
+    const observer = new ResizeObserver(fit);
+    observer.observe(container);
+    fit();
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+    };
+  }, [events, selectedUrl, map]);
+  return null;
+}
 
 function ResponsivePopups() {
   const map = useMap();
@@ -48,9 +83,9 @@ function ResponsivePopups() {
       resizeFrame = requestAnimationFrame(() => {
         if (!container.clientWidth || !container.clientHeight) return;
         const viewport = window.visualViewport;
-        const width = Math.min(360, container.clientWidth - 24, (viewport?.width ?? innerWidth) - 24);
+        const width = Math.min(340, container.clientWidth - 24, (viewport?.width ?? innerWidth) - 24);
         // Reserve room for the zoom controls, popup tip and map attribution.
-        const height = Math.min(560, Math.min(container.clientHeight, viewport?.height ?? innerHeight) - 132);
+        const height = Math.min(440, Math.min(container.clientHeight, viewport?.height ?? innerHeight) - 160);
         container.style.setProperty("--event-popup-width", `${Math.max(0, width)}px`);
         container.style.setProperty("--event-popup-height", `${Math.max(0, height)}px`);
         map.invalidateSize({ pan: false });
@@ -117,7 +152,7 @@ function MapController({
     const marker = markerRefs.current.get(selectedUrl);
     if (!marker) {
       map.closePopup();
-      onError("Could not find this event on the map. Use its official listing beside search.");
+      onError("Could not find this event on the map. Switch to List for its official listing.");
       return;
     }
     let cancelled = false;
@@ -135,7 +170,7 @@ function MapController({
       }
     } catch (error) {
       console.error("Could not open the selected event on the map.", error);
-      onError("Could not open this event on the map. Use its official listing beside search.");
+      onError("Could not open this event on the map. Switch to List for its official listing.");
     }
     return () => { cancelled = true; };
   }, [selectedEvent, markerRefs, clusterRef, map, onError, onReveal]);
@@ -153,22 +188,23 @@ export default function EventMap({
 
   return (
     <>
-      {mapError && <p role="alert" className="p-3 text-red-300">{mapError}</p>}
+      {mapError && <p role="alert" className="map-error">{mapError}</p>}
       <MapContainer
         center={position}
         zoom={zoom}
+        zoomSnap={0.25}
         scrollWheelZoom
-        className="w-full lg:h-dvh h-[80dvh]"
+        className="event-map"
       >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          className="night-tiles"
         />
-        <MarkerClusterGroup ref={clusterRef} chunkedLoading>
+        <MarkerClusterGroup ref={clusterRef} chunkedLoading iconCreateFunction={clusterIcon}>
           {events.map((event) => event.geocode === null ? null : (
             <Marker
               key={event.url}
-              title={event.title}
               alt={event.title}
               position={event.geocode}
               icon={event.url === selectedUrl ? selectedIcon : normalIcon}
@@ -189,9 +225,9 @@ export default function EventMap({
             position={selectedEvent.geocode}
             className="event-popup"
             minWidth={1}
-            maxWidth={360}
+            maxWidth={340}
             autoPanPadding={[12, 12]}
-            autoPanPaddingTopLeft={[12, 80]}
+            autoPanPaddingTopLeft={[12, 108]}
             autoPanPaddingBottomRight={[12, 36]}
             eventHandlers={{ remove: () => onClose(selectedEvent.url) }}
           >
@@ -202,6 +238,7 @@ export default function EventMap({
           </Popup>
         )}
         <ResponsivePopups />
+        <FitResults events={events} selectedUrl={selectedUrl} />
         <MapController
           selectedEvent={selectedEvent}
           markerRefs={markerRefs}

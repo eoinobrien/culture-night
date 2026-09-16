@@ -1,12 +1,12 @@
 "use client";
 
-import { Dispatch, SetStateAction } from "react";
-
 type MapFilterProps = {
   label: string;
   options: string[];
   filterValue: string;
-  setFilter: Dispatch<SetStateAction<string>>;
+  setFilter: (value: string) => void;
+  includeAll?: boolean;
+  describedBy?: string;
 };
 
 export default function MapFilter({
@@ -14,41 +14,27 @@ export default function MapFilter({
   options,
   filterValue,
   setFilter,
+  includeAll = true,
+  describedBy,
 }: MapFilterProps) {
   return (
-    <div className="flex items-center mb-4">
-      <div className="w-1/3 md:w-1/4">
-        <label
-          className="block text-gray-300 font-bold text-right mb-1 md:mb-0 pr-4"
-          htmlFor={`inline-${label.replace(" ", "-").toLocaleLowerCase()}`}
-        >
-          {label}
-        </label>
-      </div>
-      <div className="relative grow">
-        <select
-          className="block appearance-none w-full bg-gray-700 border border-gray-800 text-gray-200 py-3 px-4 pr-8 rounded leading-tight focus:outline-none focus:bg-gray-600 focus:border-gray-500"
-          id={`inline-${label.replace(" ", "-").toLocaleLowerCase()}`}
-          value={filterValue}
-          onChange={(e) => setFilter(e.target.value)}
-        >
-          <option>All</option>
-          {options
-            .filter((value, index) => options.indexOf(value) === index)
-            .map((option, index) => (
-              <option key={index}>{option}</option>
-            ))}
-        </select>
-        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-300">
-          <svg
-            className="fill-current h-4 w-4"
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 20 20"
-          >
-            <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
-          </svg>
-        </div>
-      </div>
+    <div className="filter-field">
+      <label htmlFor={`inline-${label.replaceAll(" ", "-").toLowerCase()}`}>
+        {label}
+      </label>
+      <select
+        id={`inline-${label.replaceAll(" ", "-").toLowerCase()}`}
+        aria-describedby={describedBy}
+        value={filterValue}
+        onChange={(e) => setFilter(e.target.value)}
+      >
+        {includeAll && <option>All</option>}
+        {options
+          .filter((value, index) => options.indexOf(value) === index)
+          .map((option) => (
+            <option key={option}>{option}</option>
+          ))}
+      </select>
     </div>
   );
 }
