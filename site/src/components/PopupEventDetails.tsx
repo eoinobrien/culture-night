@@ -7,6 +7,7 @@ import {
 } from "@heroicons/react/24/solid";
 import PopupDetail from "./PopupDetail";
 import { useEffect, useRef } from "react";
+import SaveEventButton, { type ShortlistControls } from "./SaveEventButton";
 
 function webLink(value: string | null): string | undefined {
   if (!value) return undefined;
@@ -22,9 +23,11 @@ function webLink(value: string | null): string | undefined {
 export default function PopupEventDetails({
   event,
   onDismiss,
+  shortlist,
 }: {
   event: CultureNightEvent;
   onDismiss?: () => void;
+  shortlist?: ShortlistControls;
 }) {
   const heading = useRef<HTMLElement>(null);
   const focusOnOpen = Boolean(onDismiss);
@@ -61,6 +64,7 @@ export default function PopupEventDetails({
         <h2 className="text-xl font-bold [overflow-wrap:anywhere]">{event.title}</h2>
       </header>
       <div className="event-details-body" tabIndex={0} aria-label="Event details">
+        {shortlist && <SaveEventButton event={event} shortlist={shortlist} />}
         <dl className="event-essentials">
           {event.time && <PopupDetail label="Time" icon={<ClockIcon />} text={event.time} />}
           {event.venueName && <PopupDetail label="Venue" icon={<MapPinIcon />} text={event.venueName} />}

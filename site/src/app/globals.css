@@ -44,6 +44,22 @@ button svg { width: 20px; height: 20px; flex-shrink: 0; }
 }
 .app-header h1 { font-size: 26px; font-weight: 750; line-height: 1.2; letter-spacing: -.8px; }
 .app-header p { font-size: 13px; color: var(--muted); }
+.app-brand { display: flex; align-items: baseline; gap: 24px; min-width: 0; }
+.my-night-toggle { display: inline-flex; align-items: center; gap: 7px; min-height: 44px; padding: 0 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); font-size: 13px; white-space: nowrap; }
+.my-night-toggle[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+.saved-count { font-size: 11px; border-radius: 4px; padding: 1px 5px; color: var(--accent-ink); background: var(--accent); }
+.my-night-intro { min-height: 52px; }
+.my-night-intro h2 { font-size: 20px; font-weight: 650; }
+.my-night-intro p { color: var(--muted); font-size: 11px; margin-top: 3px; }
+.storage-notice { flex-shrink: 0; padding: 10px 16px; color: #ffe0ab; background: #302719; border-bottom: 1px solid #665435; font-size: 12px; }
+.unavailable-saved { padding: 12px 22px; font-size: 12px; color: var(--muted); }
+.event-result { position: relative; }
+.save-event-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 8px 12px; border: 1px solid #555; border-radius: 7px; background: var(--surface); font-size: 12px; }
+.save-event-button[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); }
+.save-event-button:disabled, .my-night-toggle:disabled { opacity: .6; cursor: wait; }
+.compact-save { position: absolute; bottom: 14px; right: 14px; width: 44px; padding: 0; }
+.event-card-action.with-save { justify-content: flex-start; min-height: 44px; padding-right: 54px; }
+.event-details-body > .save-event-button { margin-bottom: 14px; }
 .discovery-workspace { display: grid; grid-template-columns: 400px minmax(0, 1fr); min-height: 0; flex: 1; }
 .discovery-sidebar { min-height: 0; display: flex; flex-direction: column; border-right: 1px solid var(--border); }
 .discovery-controls { flex-shrink: 0; padding: 22px 22px 0; position: relative; z-index: 2; background: var(--background); }
@@ -149,9 +165,13 @@ mark { color: var(--accent); background: transparent; font-weight: 750; }
 .map-caption span:first-child { font-weight: 650; font-size: 12px; }
 .map-caption span:last-child { color: var(--muted); font-size: 11px; }
 .map-loading { padding: 100px 24px; text-align: center; color: var(--muted); }
-.map-empty, .map-error { position: absolute; top: 120px; left: 16px; right: 16px; max-width: 340px; background: var(--surface); border: 1px solid var(--border); padding: 16px; border-radius: 10px; z-index: 450; }
-.map-empty strong { display: block; margin-bottom: 8px; }
-.map-empty button { margin-right: 16px; }
+.map-error { position: absolute; top: 120px; left: 16px; right: 16px; max-width: 340px; background: var(--surface); border: 1px solid var(--border); padding: 16px; border-radius: 10px; z-index: 450; }
+.map-empty { height: 100%; overflow-y: auto; overscroll-behavior: contain; display: flex; background: var(--surface); }
+.map-empty-content { margin: auto; width: 100%; max-width: 390px; padding: 24px; flex-shrink: 0; }
+.map-empty-content > svg { width: 32px; height: 32px; color: var(--muted); margin-bottom: 14px; }
+.map-empty h2 { font-size: 21px; font-weight: 650; letter-spacing: -.4px; }
+.map-empty p { margin: 10px 0 16px; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.map-empty-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; }
 .map-error { color: #ffb4b4; }
 .unmapped-notice { position: absolute; bottom: 32px; left: 12px; right: 12px; z-index: 450; border: 1px solid var(--border); border-radius: 8px; padding: 12px; background: var(--surface); color: var(--accent); font-size: 12px; }
 .leaflet-container { background: #151515 !important; font-family: inherit !important; }
@@ -185,9 +205,12 @@ mark { color: var(--accent); background: transparent; font-weight: 750; }
 .event-popup a:focus-visible, .event-popup summary:focus-visible, .event-details-header:focus-visible, .event-details-body:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 
 @media (max-width: 799px) {
-  .app-header { display: block; padding: 14px 16px 10px; border-bottom: 0; }
+  .app-header { padding: 14px 16px 10px; border-bottom: 0; gap: 8px; }
+  .app-brand { display: block; }
   .app-header h1 { font-size: 23px; }
   .app-header p { font-size: 11px; margin-top: 4px; }
+  .my-night-toggle { padding: 0 8px; font-size: 12px; gap: 5px; }
+  .my-night-toggle svg { width: 17px; height: 17px; }
   .discovery-workspace { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
   .discovery-sidebar { display: contents; }
   .discovery-controls { grid-row: 1; padding: 4px 16px 0; border-bottom: 1px solid var(--border); }

@@ -3,6 +3,7 @@ import Image from "next/image";
 import { ArrowUpRightIcon, ClockIcon, PhotoIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import type { CultureNightEvent } from "@/interfaces/culture-night-event";
 import PopupEventDetails from "./PopupEventDetails";
+import SaveEventButton, { type ShortlistControls } from "./SaveEventButton";
 
 function EventImage({ event, priority }: { event: CultureNightEvent; priority: boolean }) {
   const [failed, setFailed] = useState(false);
@@ -30,6 +31,7 @@ function EventImage({ event, priority }: { event: CultureNightEvent; priority: b
 
 export default function EventResults({
   events, selectedEvent, onSelect, onClose, onClear, onReset, timeError,
+  shortlist, myNight = false, onBrowse,
 }: {
   events: CultureNightEvent[];
   selectedEvent?: CultureNightEvent;
@@ -38,16 +40,25 @@ export default function EventResults({
   onClear: () => void;
   onReset: () => void;
   timeError?: string;
+  shortlist?: ShortlistControls;
+  myNight?: boolean;
+  onBrowse?: () => void;
 }) {
   const [limit, setLimit] = useState(30);
   if (!events.length) {
     return (
-      <section className="empty-results" aria-label="No matching events">
-        <h3>{timeError ? "Check your availability" : "No matching events"}</h3>
-        <p>{timeError || "Try another place, event or venue, or change your filters."}</p>
+      <section className="empty-results" aria-label={myNight ? "No saved events" : "No matching events"}>
+        <h3>{myNight ? "No saved events yet" : timeError ? "Check your availability" : "No matching events"}</h3>
+        <p>{myNight ? "Save events from the list or map to find them here." : timeError || "Try another place, event or venue, or change your filters."}</p>
         <div>
-          <button type="button" className="text-button" onClick={onClear}>Clear search</button>
-          <button type="button" className="text-button" onClick={onReset}>Reset filters</button>
+          {myNight ? (
+            <button type="button" className="primary-button" onClick={onBrowse}>Browse events</button>
+          ) : (
+            <>
+              <button type="button" className="text-button" onClick={onClear}>Clear search</button>
+              <button type="button" className="text-button" onClick={onReset}>Reset filters</button>
+            </>
+          )}
         </div>
       </section>
     );
@@ -74,15 +85,15 @@ export default function EventResults({
               <XMarkIcon aria-hidden="true" />
             </button>
           </div>
-          <PopupEventDetails event={selectedEvent} onDismiss={() => onClose(selectedEvent.url)} />
+          <PopupEventDetails event={selectedEvent} onDismiss={() => onClose(selectedEvent.url)} shortlist={shortlist} />
         </section>
       )}
-      <ul className="event-results" aria-label="Matching event results">
+      <ul className="event-results" aria-label={myNight ? "Saved event results" : "Matching event results"}>
         {events.slice(0, limit).map((event, index) => (
-          <li key={event.url}>
+          <li key={event.url} className="event-result">
             <button
               type="button"
-              className={`event-card ${index === 0 ? "featured-event" : ""}`}
+              className={`event-card ${index === 0 && !myNight ? "featured-event" : ""}`}
               aria-pressed={selectedEvent?.url === event.url}
               onClick={() => onSelect(event)}
             >
@@ -95,9 +106,10 @@ export default function EventResults({
                   <span className="event-time"><ClockIcon aria-hidden="true" />{event.time}</span>
                   <span className="booking-badge">{event.bookingDetails}</span>
                 </span>
-                <span className="event-card-action">View event <ArrowUpRightIcon aria-hidden="true" /></span>
+                <span className={`event-card-action ${shortlist ? "with-save" : ""}`}>View event <ArrowUpRightIcon aria-hidden="true" /></span>
               </span>
             </button>
+            {shortlist && <SaveEventButton event={event} shortlist={shortlist} compact />}
           </li>
         ))}
       </ul>

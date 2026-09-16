@@ -2,7 +2,7 @@
 
 import { CultureNightEvent } from "@/interfaces/culture-night-event";
 import Events from "../api/events.json";
-import { programmeDate } from "@/api/programme";
+import { programmeDate, programmeYear } from "@/api/programme";
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Geocode } from "@/interfaces/geocode";
@@ -10,11 +10,15 @@ import { Time } from "@/interfaces/time";
 import SearchBox from "@/components/SearchBox";
 import FiltersColumn from "@/components/FiltersColumn";
 import EventResults from "@/components/EventResults";
-import { AdjustmentsHorizontalIcon, ListBulletIcon, MapIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import { AdjustmentsHorizontalIcon, BookmarkIcon, ListBulletIcon, MapIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { availabilityError, filterEvents, searchEvents } from "@/lib/event-filters";
+import { savedEventsInTimeOrder } from "@/lib/my-night";
+import useMyNight from "@/hooks/useMyNight";
+import MapEmptyState from "@/components/MapEmptyState";
 
 const IrelandLatLng: Geocode = { lat: 53.4230965, lng: -7.9254405 };
 const events: CultureNightEvent[] = Events;
+const knownEventUrls = new Set(events.map((event) => event.url));
 const Map = dynamic(() => import("@/components/EventMap"), {
   loading: () => <p role="status" className="map-loading">Loading the event map...</p>,
   ssr: false,
@@ -30,6 +34,8 @@ export default function Home() {
   const [selectedUrl, setSelectedUrl] = useState<string>();
   const [view, setView] = useState<"list" | "map">("list");
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [myNightOpen, setMyNightOpen] = useState(false);
+  const myNight = useMyNight(programmeYear);
   const filterButton = useRef<HTMLButtonElement>(null);
   const resultsPanel = useRef<HTMLDivElement>(null);
 
@@ -41,14 +47,21 @@ export default function Home() {
     () => searchEvents(filteredEvents, searchTerm),
     [filteredEvents, searchTerm]
   );
-  const selectedEvent = matchingEvents.find((event) => event.url === selectedUrl);
-  const timeError = availabilityError(startTime, endTime);
+  const savedEvents = useMemo(() => savedEventsInTimeOrder(events, myNight.urls), [myNight.urls]);
+  const shortlist = useMemo(() => ({
+    urls: new Set(myNight.urls), ready: myNight.ready, toggle: myNight.toggle,
+  }), [myNight.urls, myNight.ready, myNight.toggle]);
+  const unavailableSavedUrls = myNight.urls.filter((url) => !knownEventUrls.has(url));
+  const visibleEvents = myNightOpen ? savedEvents : matchingEvents;
+  const selectedEvent = visibleEvents.find((event) => event.url === selectedUrl);
+  const timeError = myNightOpen ? undefined : availabilityError(startTime, endTime);
   const activeFilters = [
     startTime.hour !== 15 || startTime.minute !== 0 || endTime.hour !== 3 || endTime.minute !== 0,
     eventType !== "All", bookingDetails !== "All", ageGroup !== "All",
   ].filter(Boolean).length;
-  const unmappedEventCount = matchingEvents.filter((event) => !event.geocode).length;
-  const resultKey = JSON.stringify([searchTerm, startTime, endTime, eventType, bookingDetails, ageGroup]);
+  const unmappedEventCount = visibleEvents.filter((event) => !event.geocode).length;
+  const hasMapLocations = visibleEvents.length > unmappedEventCount;
+  const resultKey = JSON.stringify([myNightOpen, searchTerm, startTime, endTime, eventType, bookingDetails, ageGroup]);
 
   useEffect(() => {
     if (selectedUrl && !selectedEvent) setSelectedUrl(undefined);
@@ -88,17 +101,42 @@ export default function Home() {
     setFiltersOpen(false);
     filterButton.current?.focus();
   };
+  const switchCollection = (saved: boolean) => {
+    setMyNightOpen(saved);
+    setView("list");
+    setFiltersOpen(false);
+    setSelectedUrl(undefined);
+  };
 
   return (
     <main className="culture-app">
       <header className="app-header">
-        <h1>Culture Night</h1>
-        <p>{programmeDate}</p>
+        <div className="app-brand">
+          <h1>Culture Night</h1>
+          <p>{programmeDate}</p>
+        </div>
+        <button
+          type="button"
+          className="my-night-toggle"
+          aria-label={myNight.ready ? `My Night, ${savedEvents.length} saved ${savedEvents.length === 1 ? "event" : "events"}` : "My Night, loading saved events"}
+          aria-pressed={myNightOpen}
+          disabled={!myNight.ready}
+          onClick={() => switchCollection(!myNightOpen)}
+        >
+          <BookmarkIcon aria-hidden="true" />
+          My Night <span className="saved-count" aria-hidden="true">{myNight.ready ? savedEvents.length : "..."}</span>
+        </button>
       </header>
+      {myNight.notice && <p role="alert" className="storage-notice">{myNight.notice}</p>}
       <div className={`discovery-workspace ${view}-view`}>
         <section className="discovery-sidebar" aria-label="Find events">
           <div className="discovery-controls">
-            <SearchBox
+            {myNightOpen ? (
+              <div className="my-night-intro">
+                <h2>My Night</h2>
+                <p>{myNight.persistent ? "Saved in this browser." : "Kept for this visit only."} Ordered by start time.</p>
+              </div>
+            ) : <SearchBox
               searchTerm={searchTerm}
               setSearchTerm={changeSearch}
               suggestions={matchingEvents}
@@ -106,9 +144,11 @@ export default function Home() {
               runSearch={runSearch}
               clearSearch={clearSearch}
               hasSelection={Boolean(selectedEvent)}
-            />
+            />}
             <div className="discovery-toolbar">
-              <button
+              {myNightOpen ? (
+                <button type="button" className="text-button" onClick={() => switchCollection(false)}>Browse events</button>
+              ) : <button
                 type="button"
                 ref={filterButton}
                 className="filter-toggle"
@@ -118,7 +158,7 @@ export default function Home() {
               >
                 <AdjustmentsHorizontalIcon aria-hidden="true" />
                 Filters {activeFilters > 0 && <span className="filter-count">{activeFilters}</span>}
-              </button>
+              </button>}
               <div className="view-switch" role="group" aria-label="Results view">
                 <button type="button" aria-pressed={view === "list"} onClick={() => setView("list")}>
                   <ListBulletIcon aria-hidden="true" /> List
@@ -127,13 +167,13 @@ export default function Home() {
                   <MapIcon aria-hidden="true" /> Map
                 </button>
               </div>
-              <span className="scope-label">All Ireland</span>
+              <span className="scope-label">{myNightOpen ? "Your shortlist" : "All Ireland"}</span>
             </div>
             <div className="results-heading">
               <h2 role="status" aria-live="polite" aria-atomic="true">
-                {matchingEvents.length.toLocaleString("en-IE")} {matchingEvents.length === 1 ? "event" : "events"}
+                {visibleEvents.length.toLocaleString("en-IE")} {myNightOpen ? "saved " : ""}{visibleEvents.length === 1 ? "event" : "events"}
               </h2>
-              <span>{searchTerm.trim() ? "Matching your search" : "Across Ireland"}</span>
+              <span>{myNightOpen ? "By start time" : searchTerm.trim() ? "Matching your search" : "Across Ireland"}</span>
             </div>
             {filtersOpen && (
               <section
@@ -177,47 +217,67 @@ export default function Home() {
             )}
           </div>
           <div className="results-panel" ref={resultsPanel}>
+            {myNightOpen && unavailableSavedUrls.length > 0 && (
+              <div className="unavailable-saved" role="status">
+                <p>{unavailableSavedUrls.length} saved {unavailableSavedUrls.length === 1 ? "event is" : "events are"} no longer in this programme.</p>
+                <button type="button" className="text-button" onClick={() => myNight.remove(unavailableSavedUrls)}>
+                  Remove unavailable events
+                </button>
+              </div>
+            )}
             <EventResults
               key={resultKey}
-              events={matchingEvents}
+              events={visibleEvents}
               selectedEvent={selectedEvent}
               onSelect={selectSuggestion}
               onClose={closeEvent}
               onClear={clearSearch}
               onReset={resetFilters}
               timeError={timeError}
+              shortlist={shortlist}
+              myNight={myNightOpen}
+              onBrowse={() => switchCollection(false)}
             />
             <p className="programme-note">
-              {events.length.toLocaleString("en-IE")} events in the programme.
-              Check official listings for updates and admission details.
+              {myNightOpen
+                ? `${myNight.persistent ? "Saved on this browser and device only." : "Kept for this visit only."} Saving an event does not book a place. After-midnight events appear last.`
+                : `${events.length.toLocaleString("en-IE")} events in the programme. Check official listings for updates and admission details.`}
             </p>
           </div>
         </section>
         <section className="map-panel" aria-label="Event map">
-          <div className="map-caption">
-            <span>All Ireland</span>
-            <span>Select a pin to see an event</span>
-          </div>
-          {matchingEvents.length === 0 && (
-            <div className="map-empty" role="status">
-              <strong>{timeError || "No events match your search and filters."}</strong>
-              <button type="button" className="text-button" onClick={clearSearch}>Clear search</button>
-              <button type="button" className="text-button" onClick={resetFilters}>Reset filters</button>
-            </div>
+          {hasMapLocations ? (
+            <>
+              <div className="map-caption">
+                <span>{myNightOpen ? "My Night" : "All Ireland"}</span>
+                <span>Select a pin to see an event</span>
+              </div>
+              {unmappedEventCount > 0 && (
+                <button type="button" className="unmapped-notice" onClick={() => setView("list")}>
+                  {unmappedEventCount} events have no map location. View them in the list.
+                </button>
+              )}
+              <Map
+                position={IrelandLatLng}
+                zoom={7}
+                events={visibleEvents}
+                selectedUrl={selectedEvent?.url}
+                onSelect={setSelectedUrl}
+                onClose={closeEvent}
+                shortlist={shortlist}
+              />
+            </>
+          ) : (
+            <MapEmptyState
+              myNight={myNightOpen}
+              hasUnmappedEvents={visibleEvents.length > 0 || (myNightOpen && unavailableSavedUrls.length > 0)}
+              timeError={timeError}
+              onClear={clearSearch}
+              onReset={resetFilters}
+              onBrowse={() => switchCollection(false)}
+              onShowList={() => setView("list")}
+            />
           )}
-          {unmappedEventCount > 0 && (
-            <button type="button" className="unmapped-notice" onClick={() => setView("list")}>
-              {unmappedEventCount} events have no map location. View them in the list.
-            </button>
-          )}
-          <Map
-            position={IrelandLatLng}
-            zoom={7}
-            events={matchingEvents}
-            selectedUrl={selectedEvent?.url}
-            onSelect={setSelectedUrl}
-            onClose={closeEvent}
-          />
         </section>
       </div>
     </main>

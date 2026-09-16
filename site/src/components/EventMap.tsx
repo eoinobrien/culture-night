@@ -12,6 +12,7 @@ import { CultureNightEvent } from "@/interfaces/culture-night-event";
 import PopupEventDetails from "./PopupEventDetails";
 import { useEffect, useRef, useState, type RefObject } from "react";
 import L from "leaflet";
+import type { ShortlistControls } from "./SaveEventButton";
 
 type EventMapProps = {
   position: Geocode;
@@ -20,6 +21,7 @@ type EventMapProps = {
   selectedUrl?: string;
   onSelect: (url: string) => void;
   onClose: (url: string) => void;
+  shortlist?: ShortlistControls;
 };
 
 function createIcon(selected: boolean) {
@@ -162,6 +164,8 @@ function MapController({
       }
     };
     try {
+      // List selection makes a previously hidden phone map visible in this render.
+      map.invalidateSize({ pan: false });
       const cluster = clusterRef.current;
       if (cluster) cluster.zoomToShowLayer(marker, open);
       else {
@@ -178,7 +182,7 @@ function MapController({
 }
 
 export default function EventMap({
-  position, zoom, events, selectedUrl, onSelect, onClose,
+  position, zoom, events, selectedUrl, onSelect, onClose, shortlist,
 }: EventMapProps) {
   const markerRefs = useRef(new Map<string, L.Marker>());
   const clusterRef = useRef<L.MarkerClusterGroup>(null);
@@ -234,6 +238,7 @@ export default function EventMap({
             <PopupEventDetails
               event={selectedEvent}
               onDismiss={() => onClose(selectedEvent.url)}
+              shortlist={shortlist}
             />
           </Popup>
         )}

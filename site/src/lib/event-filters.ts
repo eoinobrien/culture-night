@@ -14,13 +14,13 @@ const nightEnd = 3 * 60;
 const minutes = (time: Time) => time.hour * 60 + time.minute;
 
 // The selector runs from 15:00 through 03:00 on the following morning.
-const availabilityMinutes = (time: Time) => {
+export const programmeMinutes = (time: Time) => {
   const value = minutes(time);
   return value <= nightEnd ? value + minutesPerDay : value;
 };
 
 export function availabilityError(start: Time, end: Time): string | undefined {
-  if (availabilityMinutes(end) < availabilityMinutes(start)) {
+  if (programmeMinutes(end) < programmeMinutes(start)) {
     return "Available until must be at or after Available from.";
   }
 }
@@ -31,10 +31,10 @@ export function overlapsAvailability(
   end: Time
 ): boolean {
   if (availabilityError(start, end)) return false;
-  const from = availabilityMinutes(start);
-  const until = availabilityMinutes(end);
+  const from = programmeMinutes(start);
+  const until = programmeMinutes(end);
   const rawStart = minutes(event.startTime);
-  const eventStart = availabilityMinutes(event.startTime);
+  const eventStart = programmeMinutes(event.startTime);
   let eventEnd = minutes(event.endTime) + (eventStart - rawStart);
   if (eventEnd < eventStart) eventEnd += minutesPerDay;
 
