@@ -39,13 +39,13 @@ test("the indicator is absent online and shows only an icon and Offline while di
   }
 });
 
-test("mapped events expose complete details without tiles or photos while offline", () => {
-  const event = { ...events[0], description: "A complete offline description.", fullAddress: "Offline venue address" };
+test("unavailable maps expose complete details without discarding the selected event", () => {
+  const event = { ...events[0], image: "", description: "A complete offline description.", fullAddress: "Offline venue address" };
   const props = {
     events: [event], selectedEvent: event, onSelect: () => {}, onClose: () => {},
     onClear: () => {}, onReset: () => {},
   };
-  const offline = renderToStaticMarkup(createElement(EventResults, { ...props, offline: true }));
+  const offline = renderToStaticMarkup(createElement(EventResults, { ...props, offline: true, mapUnavailable: true }));
   assert.ok(offline.includes(event.description));
   assert.ok(offline.includes(event.fullAddress));
   assert.ok(!offline.includes("event-image"));
@@ -57,7 +57,7 @@ test("mapped events expose complete details without tiles or photos while offlin
   assert.ok(online.includes(event.description));
 });
 
-test("all offline collections use text-only cards without image containers or placeholders", () => {
+test("all collections attempt available photos regardless of connectivity and omit missing images", () => {
   const sample = [events[0], { ...events[1], image: "" }];
   for (const collection of ["browse", "my-night", "shared", "event"] as const) {
     const props = {
@@ -65,18 +65,14 @@ test("all offline collections use text-only cards without image containers or pl
       onClear: () => {}, onReset: () => {},
     };
     const offline = renderToStaticMarkup(createElement(EventResults, { ...props, offline: true }));
-    assert.equal((offline.match(/text-only-event/g) ?? []).length, 2);
-    assert.ok(!offline.includes("event-image"));
     assert.ok(!offline.includes("image-placeholder"));
-    assert.ok(!offline.includes("<img"));
+    assert.equal((offline.match(/class="event-image"/g) ?? []).length, 1);
+    assert.ok(offline.includes("<img"));
     for (const event of sample) {
       assert.ok(offline.includes(event.title));
       assert.ok(offline.includes(event.time));
     }
     const online = renderToStaticMarkup(createElement(EventResults, props));
-    assert.ok(!online.includes("text-only-event"));
-    assert.equal((online.match(/class="event-image"/g) ?? []).length, 2);
-    assert.ok(online.includes("<img"));
-    assert.ok(online.includes("No event image"));
+    assert.equal(online, offline);
   }
 });

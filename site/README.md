@@ -31,18 +31,24 @@ is logged in the browser console and retried in the foreground, starting after
 30 seconds and backing off to five minutes. Reconnecting retries immediately.
 There is no download panel or manual retry control.
 
-Map tiles and remote event photographs are **not** included. Offline selections
-open full details in List, and shared Map links fall back to List without losing
-the selected event. The entire map, including pins, caption and location controls,
-is hidden offline on desktop and phones. The list uses the available width instead
-of leaving an empty map column. An existing map instance stays hidden to preserve
-its camera and selection on reconnect. The Map switch is disabled until
-connectivity returns.
-Offline cards are text-only: photographs, placeholders and their reserved space
-are removed, including in My Night and shared plans. Images return online.
-When online tiles fail, the map explains
-the failure and offers List access. The selected event's **Read event details
-without the map** section also works online when maps are slow or unavailable.
+Map tiles and remote event photographs are **not** included in the offline pack.
+A connection drop does not remove loaded media or change the current view,
+selection, expanded popup details or camera. Photos and tiles can also load from
+the browser's ordinary HTTP cache after reload, subject to freshness and eviction.
+
+The map stays visible while any usable tile overlaps its viewport. Partial
+coverage shows a short warning without discarding the remaining map. If all
+visible tiles fail, or none becomes usable within 15 seconds, the entire map
+panel is hidden and the list uses the available width. Full selected-event details
+remain available without rewriting the requested view in the URL. **Try map again**
+retries in place, and reconnection restores a failed map. An existing map instance
+stays mounted to preserve its camera and selection.
+
+Photos are handled independently: missing or failed images collapse to text-only
+cards, without placeholders or reserved image space. Successful photos stay
+mounted through a connection drop. Failed photos retry on reconnect, including
+in My Night and shared plans. The selected event's **Read event details without
+the map** section also works when maps are slow or unavailable.
 Booking, official listings, online content and Google Maps require connectivity.
 The saved programme cannot reflect later cancellations or booking changes.
 
@@ -356,7 +362,8 @@ unvisited shared links, saved-plan edits, unsupported routes, interrupted and
 corrupted downloads, missing cache entries, blocked storage and release updates.
 It also checks automatic recovery and retry backoff, the offline-only header
 indicator, inline date alignment from 320 pixels through desktop widths, and
-list-only offline layouts across disconnect, reload, resize and reconnection.
+media retention through disconnect, browser HTTP-cache reuse after reload,
+partial and missing map coverage, text-only failed-photo cards and reconnection.
 External imagery is mocked; the worker's cache is checked to exclude tiles and
 remote photographs. The regular development suite continues to block workers.
 Do not run either browser suite concurrently with a build or another Next

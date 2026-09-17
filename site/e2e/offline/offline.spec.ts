@@ -37,12 +37,19 @@ async function expectOfflineList(page: Page) {
   await expect(page.locator(".map-panel")).toBeHidden();
   await expect(page.locator(".leaflet-marker-icon:visible, .map-caption:visible, .map-location-controls:visible")).toHaveCount(0);
   await expect(page.locator(".night-tiles")).toHaveCount(0);
-  await expect(page.locator(".event-image, .image-placeholder")).toHaveCount(0);
+  await expect(page.locator(".image-placeholder")).toHaveCount(0);
   await expect(page.locator(".results-panel")).toBeVisible();
   const workspace = (await page.locator(".discovery-workspace").boundingBox())!;
   const results = (await page.locator(".results-panel").boundingBox())!;
   expect(results.width).toBe(workspace.width);
   for (const card of (await page.locator(".event-card").all()).slice(0, 2)) {
+    await card.scrollIntoViewIfNeeded();
+    const image = card.locator(".event-image img");
+    await expect.poll(() => card.evaluate((element) => {
+      const photo = element.querySelector("img");
+      return !photo || photo.complete && photo.naturalWidth > 0;
+    })).toBe(true);
+    if (await image.count()) continue;
     const bounds = (await card.boundingBox())!;
     const body = (await card.locator(".event-card-body").boundingBox())!;
     const border = await card.evaluate((element) => {
@@ -92,7 +99,6 @@ test("complete guide survives offline reload, My Night edits and unvisited share
   await expect(details).toContainText(first.fullAddress);
   await expect(details).toContainText("Google Maps need internet");
   await expectOfflineList(page);
-  await expect(page.locator(".event-image img")).toHaveCount(0);
 
   const shared = await context.newPage();
   await shared.goto(createStateLink(baseURL!, {
@@ -116,44 +122,154 @@ test("complete guide survives offline reload, My Night edits and unvisited share
   await expect(shared.locator(".event-image img").first()).toBeVisible();
 });
 
-test("disconnecting an open map hides all pins and controls without losing selection or saved events", async ({ page, context, baseURL, isMobile }, testInfo) => {
+test("a brief disconnection preserves loaded media, the map view and selection until uncached reload", async ({ page, context, baseURL }, testInfo) => {
   await page.goto(createStateLink(baseURL!, {
     ...defaultUrlState(), selectedUrl: first.url, view: "map",
   }, programmeYear));
   await ready(page);
   await expect(page.locator(".event-popup")).toBeVisible();
+  await expect(page.locator(".night-tiles .leaflet-tile-loaded").first()).toBeVisible();
+  await expect.poll(() => page.locator(".event-image img").first().evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true);
   await page.locator(".event-popup").getByRole("button", { name: `Save ${first.title} to My Night`, exact: true }).click();
   await page.locator(".event-map").evaluate((element) => { element.setAttribute("data-original-map", "yes"); });
+  await page.locator(".event-image img").first().evaluate((element) => { element.setAttribute("data-original-photo", "yes"); });
+  await page.locator(".night-tiles").evaluate((element) => { element.setAttribute("data-original-tiles", "yes"); });
+  const url = page.url();
+  await page.locator(".event-popup").getByText("Full description", { exact: true }).click();
+  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+  await expect(page.locator(".leaflet-pan-anim")).toHaveCount(0);
+  const mapTransform = await page.locator(".leaflet-map-pane").getAttribute("style");
+  const activeElement = await page.evaluate(() => document.activeElement?.outerHTML);
 
   await context.setOffline(true);
-  await expectOfflineList(page);
-  await expect(page.locator(".unmapped-details")).toContainText(first.title);
+  await expect(offlineIndicator(page)).toHaveText("Offline");
+  await expect(page.locator(".event-map")).toBeVisible();
+  await expect(page.locator(".night-tiles")).toHaveAttribute("data-original-tiles", "yes");
+  await expect(page.locator(".event-image img").first()).toHaveAttribute("data-original-photo", "yes");
+  await expect(page.locator(".event-popup details[open]")).toContainText(first.description);
+  expect(page.url()).toBe(url);
+  expect(await page.evaluate(() => document.activeElement?.outerHTML)).toBe(activeElement);
+  expect(await page.locator(".leaflet-map-pane").getAttribute("style")).toBe(mapTransform);
   await expect(myNight(page)).toHaveAccessibleName("My Night, 1 saved event");
-  await page.locator(".event-card").first().scrollIntoViewIfNeeded();
-  const screenshot = testInfo.outputPath("offline-list-only.png");
+  const screenshot = testInfo.outputPath("offline-retained-media.png");
   await page.screenshot({ path: screenshot });
-  await testInfo.attach("offline-list-only", { path: screenshot, contentType: "image/png" });
-  await page.setViewportSize({ width: 1000, height: 700 });
-  await expectOfflineList(page);
-  await page.setViewportSize({ width: 320, height: 568 });
-  await expectOfflineList(page);
-  await page.setViewportSize(isMobile ? { width: 390, height: 844 } : { width: 1440, height: 900 });
+  await testInfo.attach("offline-retained-media", { path: screenshot, contentType: "image/png" });
 
   await context.setOffline(false);
   await expect(offlineIndicator(page)).toHaveCount(0);
-  await expect(page.locator(".event-image img").first()).toBeVisible();
-  if (isMobile) await page.getByRole("button", { name: "Map", exact: true }).click();
   await expect(page.locator(".event-map")).toBeVisible();
   await expect(page.locator(".night-tiles .leaflet-tile-loaded").first()).toBeVisible();
   await expect(page.locator(".event-popup")).toContainText(first.title);
   await expect(page.locator(".event-map")).toHaveAttribute("data-original-map", "yes");
   await expect(myNight(page)).toHaveAccessibleName("My Night, 1 saved event");
+  expect(page.url()).toBe(url);
+  await expect(page.locator(".night-tiles")).toHaveAttribute("data-original-tiles", "yes");
 
   await context.setOffline(true);
   await page.reload();
   await expectOfflineList(page);
   await expect(page.locator(".unmapped-details")).toContainText(first.title);
+  await page.screenshot({ path: testInfo.outputPath("unavailable-media.png") });
   await expect(myNight(page)).toHaveAccessibleName("My Night, 1 saved event");
+  expect(page.url()).toBe(url);
+  await context.setOffline(false);
+  await expect(page.locator(".event-map")).toBeVisible();
+  await expect(page.locator(".event-popup")).toContainText(first.title);
+});
+
+test("fresh browser HTTP-cache entries keep photos and tiles available after offline reload", async ({ page, context, baseURL }) => {
+  await context.unrouteAll();
+  await page.goto(createStateLink(baseURL!, {
+    ...defaultUrlState(), collection: "event", selectedUrl: first.url, view: "map",
+  }, programmeYear));
+  await ready(page);
+  await expect(page.locator(".event-popup")).toBeVisible();
+  const photo = page.locator(".event-image img").first();
+  await expect(photo).toHaveAttribute("src", /^http:\/\/127\.0\.0\.1:3014\/__offline-test\/media\/photos\//);
+  await expect.poll(() => photo.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true);
+  await expect.poll(() => page.locator(".night-tiles img").evaluateAll((images) =>
+    images.length > 0 && images.every((image) => image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0)
+  )).toBe(true);
+  const url = page.url();
+  await context.setOffline(true);
+  await page.reload();
+  await expect(offlineIndicator(page)).toHaveText("Offline");
+  await expect(page.locator(".event-popup")).toBeVisible();
+  await expect(page.locator(".night-tiles .leaflet-tile-loaded").first()).toBeVisible();
+  await expect.poll(() => photo.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true);
+  expect(page.url()).toBe(url);
+  const cached = await page.evaluate(async () => (await Promise.all((await caches.keys()).map(async (key) =>
+    (await (await caches.open(key)).keys()).map((request) => request.url)))).flat());
+  expect(cached.some((url) => url.includes("/__offline-test/media/"))).toBe(false);
+});
+
+test("failed photos become text-only cards and retry on reconnect without changing the view", async ({ page, context }) => {
+  const photos = "**/__offline-test/media/photos/0.svg";
+  await context.route(photos, (route) => route.abort("failed"));
+  await page.goto("/");
+  await ready(page);
+  const card = page.locator(".event-card").first();
+  await expect(card.locator(".event-image")).toHaveCount(0);
+  const bounds = (await card.boundingBox())!;
+  const body = (await card.locator(".event-card-body").boundingBox())!;
+  expect(bounds.width - body.width).toBe(2);
+  expect(body.x - bounds.x).toBe(1);
+  expect(body.y - bounds.y).toBe(1);
+  const neighbour = page.locator(".event-card").nth(1).locator("img");
+  await neighbour.scrollIntoViewIfNeeded();
+  await expect.poll(() => neighbour.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true);
+  await neighbour.evaluate((image) => image.setAttribute("data-original-photo", "yes"));
+  const url = page.url();
+  await context.setOffline(true);
+  await expect(offlineIndicator(page)).toHaveText("Offline");
+  await expect(neighbour).toHaveAttribute("data-original-photo", "yes");
+  await context.unroute(photos);
+  await context.setOffline(false);
+  await expect.poll(() => card.locator(".event-image img").evaluate((image: HTMLImageElement) =>
+    image.complete && image.naturalWidth > 0)).toBe(true);
+  await expect(neighbour).toHaveAttribute("data-original-photo", "yes");
+  expect(page.url()).toBe(url);
+});
+
+test("partial map coverage stays visible but panning beyond available tiles falls back", async ({ page, context, baseURL }) => {
+  let tileRequests = 0;
+  await context.route("**/__offline-test/media/tiles/**", (route) =>
+    ++tileRequests % 2 ? route.fallback() : route.abort("failed"));
+  await page.goto(createStateLink(baseURL!, { ...defaultUrlState(), searchTerm: "Belfast", view: "map" }, programmeYear));
+  await ready(page);
+  await expect(page.locator(".night-tiles .leaflet-tile-loaded").first()).toBeVisible();
+  await expect(page.locator(".map-connectivity")).toContainText("Some map tiles could not load");
+  await expect(page.locator(".event-map")).toBeVisible();
+  const url = page.url();
+  await context.setOffline(true);
+  await expect(offlineIndicator(page)).toHaveText("Offline");
+  await expect(page.locator(".event-map")).toBeVisible();
+  for (let move = 0; move < 4 && await page.locator(".event-map").isVisible(); move++) {
+    const bounds = (await page.locator(".event-map").boundingBox())!;
+    await page.mouse.move(bounds.x + bounds.width - 40, bounds.y + bounds.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(bounds.x + 40, bounds.y + bounds.height / 2, { steps: 12 });
+    await page.mouse.up();
+  }
+  await expect(page.locator(".map-panel")).toBeHidden();
+  await expect(page.locator(".results-panel")).toBeVisible();
+  await expect(page.locator(".map-fallback-notice")).toContainText("Map tiles are unavailable");
+  expect(page.url()).toBe(url);
+});
+
+test("a map with no usable tiles falls back after 15 seconds even when requests hang", async ({ page, context, baseURL }) => {
+  await page.clock.install({ time: new Date("2026-09-17T18:00:00Z") });
+  await page.clock.pauseAt(new Date("2026-09-17T18:00:01Z"));
+  await context.route("**/__offline-test/media/tiles/**", () => {});
+  await page.goto(createStateLink(baseURL!, { ...defaultUrlState(), searchTerm: "Belfast", view: "map" }, programmeYear));
+  await expect(page.locator(".event-map")).toBeVisible();
+  await page.clock.runFor(50);
+  await ready(page);
+  await page.clock.runFor(14_900);
+  await expect(page.locator(".event-map")).toBeVisible();
+  await page.clock.runFor(200);
+  await expect(page.locator(".map-panel")).toBeHidden();
+  await expect(page.locator(".map-fallback-notice")).toContainText("Map tiles are unavailable");
 });
 
 test("offline root, programme query and unsupported programme retain their real route meanings", async ({ page, context }) => {
@@ -276,21 +392,26 @@ test("failed updates keep the complete old guide; completed updates wait without
   await expect(myNight(reopened)).toHaveAccessibleName("My Night, 1 saved event");
 });
 
-test("failed online tiles offer complete text details without following an external link", async ({ page, context, baseURL }) => {
-  await context.route("https://tile.openstreetmap.org/**", (route) => route.abort("failed"));
+test("unavailable tiles fall back to complete text details and can be retried without losing selection", async ({ page, context, baseURL }) => {
+  const tileRoute = "**/__offline-test/media/tiles/**";
+  await context.route(tileRoute, (route) => route.abort("failed"));
   await page.goto(createStateLink(baseURL!, {
     ...defaultUrlState(), collection: "event", selectedUrl: first.url, view: "map",
   }, programmeYear));
   await ready(page);
-  const fallback = page.locator(".map-connectivity");
-  await expect(fallback).toContainText("Map tiles could not load");
-  await fallback.getByRole("button", { name: "Read event details in List", exact: true }).click();
-  const selected = page.locator(".selected-result");
-  await selected.getByText("Read event details without the map", { exact: true }).click();
+  const fallback = page.locator(".map-fallback-notice");
+  await expect(fallback).toContainText("Map tiles are unavailable");
+  await expect(page.locator(".map-panel")).toBeHidden();
+  const selected = page.locator(".unmapped-details");
   await selected.getByText("Full description", { exact: true }).click();
   await expect(selected).toContainText(first.description);
   await selected.getByText("Address, age and accessibility", { exact: true }).click();
   await expect(selected).toContainText(first.fullAddress);
+  await context.unroute(tileRoute);
+  await fallback.getByRole("button", { name: "Try map again", exact: true }).click();
+  await expect(page.locator(".event-map")).toBeVisible();
+  await expect(page.locator(".night-tiles .leaflet-tile-loaded").first()).toBeVisible();
+  await expect(page.locator(".event-popup")).toContainText(first.title);
 });
 
 test("blocked offline storage is logged without adding online UI or blocking discovery", async ({ page }) => {

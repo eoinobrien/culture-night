@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
-import { ArrowUpRightIcon, ClockIcon, PhotoIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import { ArrowUpRightIcon, ClockIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { arrayMove } from "@dnd-kit/sortable";
 import type { CultureNightEvent } from "@/interfaces/culture-night-event";
 import PopupEventDetails from "./PopupEventDetails";
@@ -10,25 +10,24 @@ import { EventOrderContext, SortableEventResult } from "./EventOrder";
 
 function EventImage({ event, priority, offline }: { event: CultureNightEvent; priority: boolean; offline: boolean }) {
   const [failed, setFailed] = useState(false);
-  if (offline) return null;
+  useEffect(() => {
+    if (!offline) setFailed(false);
+  }, [offline]);
+  if (!event.image || failed) return null;
   return (
     <span className="event-image">
-      {event.image && !failed ? (
-        <Image
-          src={event.image}
-          alt=""
-          fill
-          unoptimized
-          priority={priority}
-          sizes="(min-width: 800px) 360px, 100vw"
-          onError={() => setFailed(true)}
-        />
-      ) : (
-        <span className="image-placeholder">
-          <PhotoIcon aria-hidden="true" />
-          <span>{failed ? "Image unavailable" : "No event image"}</span>
-        </span>
-      )}
+      <Image
+        src={event.image}
+        alt=""
+        fill
+        unoptimized
+        priority={priority}
+        sizes="(min-width: 800px) 360px, 100vw"
+        onError={() => {
+          console.warn("Event photo could not load; using a text-only card.", event.url);
+          setFailed(true);
+        }}
+      />
     </span>
   );
 }
@@ -36,7 +35,7 @@ function EventImage({ event, priority, offline }: { event: CultureNightEvent; pr
 export default function EventResults({
   events, selectedEvent, onSelect, onClose, onClear, onReset, timeError,
   shortlist, collection = "browse", onBrowse, getEventLink, onReorder,
-  offline = false,
+  offline = false, mapUnavailable = false,
 }: {
   events: CultureNightEvent[];
   selectedEvent?: CultureNightEvent;
@@ -51,6 +50,7 @@ export default function EventResults({
   getEventLink?: (event: CultureNightEvent) => string;
   onReorder?: (order: string[]) => void;
   offline?: boolean;
+  mapUnavailable?: boolean;
 }) {
   const [limit, setLimit] = useState(30);
   const myNight = collection === "my-night";
@@ -78,7 +78,7 @@ export default function EventResults({
   }
   return (
     <>
-      {selectedEvent?.geocode && !offline && (
+      {selectedEvent?.geocode && !mapUnavailable && (
         <section className="selected-result" aria-label="Selected event">
           <p>Selected event</p>
           <h3>{selectedEvent.title}</h3>
@@ -89,7 +89,7 @@ export default function EventResults({
           </details>
         </section>
       )}
-      {selectedEvent && (!selectedEvent.geocode || offline) && (
+      {selectedEvent && (!selectedEvent.geocode || mapUnavailable) && (
         <section className="unmapped-details" aria-label="Selected event">
           <div className="unmapped-heading">
             <p>{selectedEvent.geocode ? "Selected event" : "No map location available"}</p>
@@ -113,7 +113,7 @@ export default function EventResults({
             <div className="event-result-main">
               <button
                 type="button"
-                className={`event-card ${index === 0 && browse ? "featured-event" : ""} ${offline ? "text-only-event" : ""}`}
+                className={`event-card ${index === 0 && browse ? "featured-event" : ""}`}
                 aria-pressed={selectedEvent?.url === event.url}
                 onClick={() => onSelect(event)}
               >

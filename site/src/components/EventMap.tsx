@@ -10,11 +10,12 @@ import "leaflet-defaulticon-compatibility/dist/leaflet-defaulticon-compatibility
 import { Geocode } from "@/interfaces/geocode";
 import { CultureNightEvent } from "@/interfaces/culture-night-event";
 import PopupEventDetails from "./PopupEventDetails";
-import { useEffect, useRef, useState, type RefObject } from "react";
+import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import L from "leaflet";
 import type { ShortlistControls } from "./SaveEventButton";
 import MapLocationControl from "./MapLocationControl";
 import type { MapViewportRequest } from "@/lib/location";
+import { visibleTileStatus } from "@/lib/map-tiles";
 
 type EventMapProps = {
   position: Geocode;
@@ -25,7 +26,8 @@ type EventMapProps = {
   onClose: (url: string) => void;
   shortlist?: ShortlistControls;
   getEventLink?: (event: CultureNightEvent) => string;
-  offline?: boolean;
+  onAvailabilityChange?: (available: boolean) => void;
+  tileRetry?: number;
   onShowList?: () => void;
 };
 
@@ -50,39 +52,76 @@ const clusterIcon = (cluster: L.MarkerCluster) => L.divIcon({
   iconSize: [44, 44],
 });
 
-function VisibleMapTiles({ offline, onFailure }: { offline: boolean; onFailure: (failed: boolean) => void }) {
+function VisibleMapTiles({ onStatus, retry }: {
+  onStatus: (status: ReturnType<typeof visibleTileStatus>) => void;
+  retry: number;
+}) {
   const map = useMap();
+  const layer = useRef<L.TileLayer>(null);
+  const frame = useRef(0);
+  const loadingTimeout = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [visible, setVisible] = useState(false);
   const failed = useRef(false);
+  const clearLoadingTimeout = useCallback(() => {
+    clearTimeout(loadingTimeout.current);
+    loadingTimeout.current = undefined;
+  }, []);
+  const report = useCallback(() => {
+    cancelAnimationFrame(frame.current);
+    frame.current = requestAnimationFrame(() => {
+      const container = map.getContainer();
+      if (!container.clientWidth || !container.clientHeight || !layer.current) {
+        clearLoadingTimeout();
+        return;
+      }
+      const images = Array.from(layer.current.getContainer()?.querySelectorAll("img") ?? []);
+      const status = visibleTileStatus(container.getBoundingClientRect(), images.map((image) => ({
+        bounds: image.getBoundingClientRect(), complete: image.complete, naturalWidth: image.naturalWidth,
+      })));
+      if (status.failed && !failed.current) console.warn("Some map tiles could not load. Event details remain available in the list.");
+      failed.current = status.failed;
+      if (status.available || !status.pending) clearLoadingTimeout();
+      else if (loadingTimeout.current === undefined) {
+        loadingTimeout.current = setTimeout(() => {
+          console.warn("Map tiles did not load within 15 seconds. Showing event details in the list.");
+          onStatus({ available: false, failed: true, pending: false });
+        }, 15_000);
+      }
+      onStatus(status);
+    });
+  }, [map, onStatus, clearLoadingTimeout]);
   useEffect(() => {
     const container = map.getContainer();
-    const update = () => setVisible(container.clientWidth > 0 && container.clientHeight > 0);
+    const update = () => {
+      setVisible(container.clientWidth > 0 && container.clientHeight > 0);
+      report();
+    };
     const observer = new ResizeObserver(update);
     observer.observe(container);
+    map.on("moveend zoomend", report);
     update();
-    return () => observer.disconnect();
-  }, [map]);
+    return () => {
+      observer.disconnect();
+      map.off("moveend zoomend", report);
+      cancelAnimationFrame(frame.current);
+      clearLoadingTimeout();
+    };
+  }, [map, report, clearLoadingTimeout]);
 
-  return visible && !offline ? (
+  return visible ? (
     <TileLayer
+      key={retry}
+      ref={layer}
       attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
       url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
       className="night-tiles"
       updateWhenIdle
       updateWhenZooming={false}
       eventHandlers={{
-        tileerror: () => {
-          if (!failed.current) console.warn("Some map tiles could not load. Event details remain available in the list.");
-          failed.current = true;
-          onFailure(true);
-        },
-        load: (event) => {
-          const layer: L.TileLayer = event.target;
-          const images = layer.getContainer()?.querySelectorAll("img");
-          const missing = Boolean(images && Array.from(images).some((image) => image.complete && image.naturalWidth === 0));
-          failed.current = missing;
-          onFailure(missing);
-        },
+        loading: report,
+        tileload: report,
+        tileerror: report,
+        load: report,
       }}
     />
   ) : null;
@@ -266,7 +305,8 @@ function MapController({
 }
 
 export default function EventMap({
-  position, zoom, events, selectedUrl, onSelect, onClose, shortlist, getEventLink, offline = false, onShowList,
+  position, zoom, events, selectedUrl, onSelect, onClose, shortlist, getEventLink, onShowList,
+  onAvailabilityChange, tileRetry = 0,
 }: EventMapProps) {
   const markerRefs = useRef(new Map<string, L.Marker>());
   const clusterRef = useRef<L.MarkerClusterGroup>(null);
@@ -275,12 +315,17 @@ export default function EventMap({
   const [viewportRequest, setViewportRequest] = useState<MapViewportRequest>();
   const [tilesFailed, setTilesFailed] = useState(false);
   const selectedEvent = events.find((event) => event.url === selectedUrl);
+  const tileStatus = useCallback((status: ReturnType<typeof visibleTileStatus>) => {
+    setTilesFailed(status.failed);
+    if (status.available) onAvailabilityChange?.(true);
+    else if (status.failed && !status.pending) onAvailabilityChange?.(false);
+  }, [onAvailabilityChange]);
 
   return (
     <>
       {mapError && <p role="alert" className="map-error">{mapError}</p>}
-      {(offline || tilesFailed) && <div className="map-connectivity">
-        <p role="status">{offline ? "Map tiles need internet." : "Map tiles could not load."} Event details still work.</p>
+      {tilesFailed && <div className="map-connectivity">
+        <p role="status">Some map tiles could not load. Event details still work.</p>
         {onShowList && <button type="button" className="text-button" onClick={onShowList}>Read event details in List</button>}
       </div>}
       <MapContainer
@@ -292,7 +337,7 @@ export default function EventMap({
         scrollWheelZoom
         className="event-map"
       >
-        <VisibleMapTiles offline={offline} onFailure={setTilesFailed} />
+        <VisibleMapTiles onStatus={tileStatus} retry={tileRetry} />
         {/* Delayed cluster animations or marker batches can remove freshly filtered pins. */}
         <MarkerClusterGroup ref={clusterRef} animate={false} chunkedLoading={false} iconCreateFunction={clusterIcon}>
           {events.map((event) => event.geocode === null ? null : (
@@ -329,8 +374,6 @@ export default function EventMap({
               onDismiss={() => onClose(selectedEvent.url)}
               shortlist={shortlist}
               getEventLink={getEventLink}
-              offline={offline}
-              focusOnOpen={!offline}
             />
           </Popup>
         )}

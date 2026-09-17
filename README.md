@@ -14,7 +14,10 @@ Near me control centres the current results without saving location coordinates.
 The production site saves the event guide in the background during a connected
 visit. Once saved, search, full details and My Night work offline, including
 reloads. An icon and **Offline** appear beside the date only while disconnected.
-Map tiles, photographs, bookings and external websites are not included.
+Loaded map tiles and photographs stay visible through connection drops, and the
+browser can reuse cached media after reload. Unavailable maps fall back to List;
+failed photos leave text-only cards. Media is not downloaded as an offline pack.
+Bookings and external websites still need internet.
 
 Culture Night 2026 takes place on **Friday 18 September 2026**. The map uses a saved
 snapshot of the [official event listings](https://culturenight.ie/events/), not a

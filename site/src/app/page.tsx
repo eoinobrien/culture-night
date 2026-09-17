@@ -39,6 +39,10 @@ export default function Home() {
   const eventOpen = collection === "event";
   const browsing = collection === "browse";
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [mapUnavailable, setMapUnavailable] = useState(false);
+  const [tileRetry, setTileRetry] = useState(0);
+  const effectiveView = mapUnavailable ? "list" : view;
+  const mapAvailabilityChanged = useCallback((available: boolean) => setMapUnavailable(!available), []);
   const [confirmReplace, setConfirmReplace] = useState(false);
   const [replaced, setReplaced] = useState(false);
   const cancelReplace = useRef<HTMLButtonElement>(null);
@@ -85,8 +89,8 @@ export default function Home() {
   useEffect(() => { setConfirmReplace(false); setReplaced(false); }, [collection, sharedUrls]);
   useEffect(() => { if (confirmReplace) cancelReplace.current?.focus(); }, [confirmReplace]);
   useEffect(() => {
-    if (offline && urlReady && view === "map") update({ view: "list" }, "replace");
-  }, [offline, urlReady, view, update]);
+    if (!offline) setMapUnavailable(false);
+  }, [offline]);
 
   const closeEvent = useCallback((url: string) => {
     update((current) => current.selectedUrl === url
@@ -102,8 +106,15 @@ export default function Home() {
     resultsPanel.current?.scrollTo({ top: 0 });
   };
   const selectSuggestion = (event: CultureNightEvent) => {
-    update({ selectedUrl: event.url, view: event.geocode && !offline ? "map" : "list" });
-    if (!event.geocode || offline) resultsPanel.current?.scrollTo({ top: 0 });
+    update({ selectedUrl: event.url, view: event.geocode && !mapUnavailable ? "map" : "list" });
+    if (!event.geocode || mapUnavailable) resultsPanel.current?.scrollTo({ top: 0 });
+  };
+  const showMap = () => {
+    if (mapUnavailable) {
+      setTileRetry((retry) => retry + 1);
+      setMapUnavailable(false);
+    }
+    update({ view: "map" });
   };
   const clearSearch = () => {
     update({ searchTerm: "", selectedUrl: undefined });
@@ -193,7 +204,7 @@ export default function Home() {
       </header>
       {myNight.notice && <p role="alert" className="storage-notice">{myNight.notice}</p>}
       {urlNotice && <p role="alert" className="storage-notice">{urlNotice}</p>}
-      <div className={`discovery-workspace ${offline ? "offline-view list-view" : `${view}-view`}`}>
+      <div className={`discovery-workspace ${mapUnavailable ? "map-unavailable-view " : ""}${effectiveView}-view`}>
         <section className="discovery-sidebar" aria-label="Find events">
           <div className={`discovery-controls ${myNightOpen ? "my-night-controls" : ""}`}>
             {!browsing ? (
@@ -228,12 +239,12 @@ export default function Home() {
                 Filters {activeFilters > 0 && <span className="filter-count">{activeFilters}</span>}
               </button>}
               <div className="view-switch" role="group" aria-label="Results view">
-                <button type="button" aria-pressed={view === "list"} onClick={() => update({ view: "list" })}>
+                <button type="button" aria-pressed={effectiveView === "list"} onClick={() => update({ view: "list" })}>
                   <ListBulletIcon aria-hidden="true" /> List
                 </button>
-                <button type="button" aria-pressed={view === "map"} disabled={offline}
-                  title={offline ? "Map tiles need internet. Event details are available in List." : undefined}
-                  onClick={() => update({ view: "map" })}>
+                <button type="button" aria-pressed={effectiveView === "map"}
+                  title={mapUnavailable ? "Try loading map tiles again" : undefined}
+                  onClick={showMap}>
                   <MapIcon aria-hidden="true" /> Map
                 </button>
               </div>
@@ -282,6 +293,12 @@ export default function Home() {
             )}
           </div>
           <div className="results-panel" ref={resultsPanel}>
+            {mapUnavailable && (
+              <div className="map-fallback-notice">
+                <p role="status">Map tiles are unavailable. Showing events in List.</p>
+                <button type="button" className="text-button" onClick={showMap}>Try map again</button>
+              </div>
+            )}
             {(myNightOpen || sharedOpen) && (
               <div className="night-sort">
                 <label htmlFor="night-sort">Sort events</label>
@@ -342,6 +359,7 @@ export default function Home() {
               onReorder={myNightOpen || sharedOpen ? reorderEvents : undefined}
               onBrowse={() => switchCollection(false)}
               offline={offline}
+              mapUnavailable={mapUnavailable}
             />
             <p className="programme-note">
               {sharedOpen
@@ -374,7 +392,8 @@ export default function Home() {
                 onClose={closeEvent}
                 shortlist={shortlist}
                 getEventLink={getEventLink}
-                offline={offline}
+                onAvailabilityChange={mapAvailabilityChanged}
+                tileRetry={tileRetry}
                 onShowList={() => {
                   update({ view: "list" });
                   resultsPanel.current?.scrollTo({ top: 0 });

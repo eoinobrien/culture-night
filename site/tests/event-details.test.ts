@@ -98,7 +98,7 @@ test("result cards keep venue, time, booking and identity for duplicate titles",
   assert.ok(html.includes("Another venue"));
   assert.ok(html.includes(sample.time));
   assert.ok(html.includes(sample.bookingDetails));
-  assert.ok(html.includes("No event image"));
+  assert.ok(!html.includes("event-image"));
 });
 
 test("results are progressively rendered without dropping the total", () => {
