@@ -8,7 +8,8 @@ booking requirements, and age group; and select an event to see its details on t
 map. Event links lead back to the official programme for current booking and
 accessibility information. My Night keeps a browser-local plan with custom
 ordering. Shareable URLs carry snapshots without automatically saving or replacing
-the recipient's plan.
+the recipient's plan. Supported browsers use native sharing. The map's opt-in
+Near me control centres the current results without saving location coordinates.
 
 Culture Night 2026 takes place on **Friday 18 September 2026**. The map uses a saved
 snapshot of the [official event listings](https://culturenight.ie/events/), not a

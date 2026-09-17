@@ -74,7 +74,7 @@ export default function PopupEventDetails({
         {(shortlist || getEventLink) && (
           <div className="event-details-actions">
             {shortlist && <SaveEventButton event={event} shortlist={shortlist} />}
-            {getEventLink && <ShareLinkButton compact label="Copy event link" identity={event.url} getLink={() => getEventLink(event)} />}
+            {getEventLink && <ShareLinkButton compact label="Share event" identity={event.url} getLink={() => getEventLink(event)} />}
           </div>
         )}
         <dl className="event-essentials">

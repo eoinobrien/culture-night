@@ -13,6 +13,8 @@ import PopupEventDetails from "./PopupEventDetails";
 import { useEffect, useRef, useState, type RefObject } from "react";
 import L from "leaflet";
 import type { ShortlistControls } from "./SaveEventButton";
+import MapLocationControl from "./MapLocationControl";
+import type { MapViewportRequest } from "@/lib/location";
 
 type EventMapProps = {
   position: Geocode;
@@ -46,20 +48,34 @@ const clusterIcon = (cluster: L.MarkerCluster) => L.divIcon({
   iconSize: [44, 44],
 });
 
-function FitResults({ events, selectedUrl }: Pick<EventMapProps, "events" | "selectedUrl">) {
+function FitResults({ events, selectedUrl, viewportRequest }: Pick<EventMapProps, "events" | "selectedUrl"> & {
+  viewportRequest?: MapViewportRequest;
+}) {
   const map = useMap();
   const fittedEvents = useRef<CultureNightEvent[] | null>(null);
+  const handledRequest = useRef<MapViewportRequest | undefined>(undefined);
   useEffect(() => {
-    if (selectedUrl || fittedEvents.current === events) return;
+    const requested = viewportRequest !== undefined && viewportRequest !== handledRequest.current;
+    if (!requested && (selectedUrl || fittedEvents.current === events)) return;
+    if (requested) handledRequest.current = viewportRequest;
     const container = map.getContainer();
     const points = events.flatMap((event) => event.geocode ? [L.latLng(event.geocode)] : []);
     let frame = 0;
+    let fitted = false;
     const fit = () => {
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
-        if (!container.clientWidth || !container.clientHeight || fittedEvents.current === events) return;
+        if (!container.clientWidth || !container.clientHeight || fitted) return;
         map.invalidateSize({ pan: false });
-        if (points.length) map.fitBounds(L.latLngBounds(points), { padding: [44, 56], maxZoom: 14, animate: false });
+        if (requested && viewportRequest.location) {
+          const location = viewportRequest.location;
+          map.fitBounds(L.latLng(location).toBounds(Math.max(1_000, location.accuracy * 2)), {
+            padding: [44, 56], maxZoom: 14, animate: false,
+          });
+        } else if (points.length) {
+          map.fitBounds(L.latLngBounds(points), { padding: [44, 56], maxZoom: 14, animate: false });
+        }
+        fitted = true;
         fittedEvents.current = events;
       });
     };
@@ -70,7 +86,7 @@ function FitResults({ events, selectedUrl }: Pick<EventMapProps, "events" | "sel
       cancelAnimationFrame(frame);
       observer.disconnect();
     };
-  }, [events, selectedUrl, map]);
+  }, [events, selectedUrl, map, viewportRequest]);
   return null;
 }
 
@@ -198,6 +214,7 @@ export default function EventMap({
   const clusterRef = useRef<L.MarkerClusterGroup>(null);
   const [mapError, setMapError] = useState<string>();
   const [revealedUrl, setRevealedUrl] = useState<string>();
+  const [viewportRequest, setViewportRequest] = useState<MapViewportRequest>();
   const selectedEvent = events.find((event) => event.url === selectedUrl);
 
   return (
@@ -255,7 +272,12 @@ export default function EventMap({
           </Popup>
         )}
         <ResponsivePopups />
-        <FitResults events={events} selectedUrl={selectedUrl} />
+        <FitResults events={events} selectedUrl={selectedUrl} viewportRequest={viewportRequest} />
+        <MapLocationControl location={viewportRequest?.location} selectedUrl={selectedUrl}
+          onViewportRequest={(request) => {
+            if (selectedUrl) onClose(selectedUrl);
+            setViewportRequest(request);
+          }} />
         <MapController
           selectedEvent={selectedEvent}
           markerRefs={markerRefs}

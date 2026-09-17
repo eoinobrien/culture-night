@@ -145,7 +145,7 @@ export default function Home() {
       </h2>
       <ShareLinkButton compact getLink={getViewLink} identity={JSON.stringify(state)}
         disabled={!urlReady || (myNightOpen && !savedEvents.length)}
-        label={myNightOpen ? "Copy My Night link" : sharedOpen ? "Copy shared night link" : eventOpen ? "Copy event link" : "Copy search link"} />
+        label={myNightOpen ? "Share My Night" : sharedOpen ? "Share shared night" : eventOpen ? "Share event" : "Share search"} />
     </div>
   );
 

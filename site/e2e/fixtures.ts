@@ -11,6 +11,13 @@ export const test = base.extend<{ browserChecks: void }>({
     if (!baseURL) throw new Error("Browser tests require a configured baseURL.");
     const origin = new URL(baseURL).origin;
 
+    await context.addInitScript(() => {
+      Object.defineProperties(navigator, {
+        share: { configurable: true, value: undefined },
+        canShare: { configurable: true, value: undefined },
+      });
+    });
+
     await context.route("**/*", async (route) => {
       const request = route.request();
       const url = new URL(request.url());

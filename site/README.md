@@ -53,6 +53,26 @@ independently when necessary, with a 44-pixel close action and no modal backdrop
 Selection survives switching between List and Map and resizing the viewport.
 Unmapped events expose the same details in the list.
 
+## Near me
+
+The map's **Near me** button requests a location only when pressed. It centres
+the current results around that location, with a blue dot and an accuracy circle.
+It does not introduce a distance filter, change searches or reorder My Night.
+Later searches and event selections can move the map normally. The adjacent
+clear button removes the location and fits all current results again.
+
+Location is requested once per press, not watched continuously. The request has
+a ten-second timeout and may use a position cached by the browser for up to one
+minute. Permission denial, timeout, missing support and unusable positions show
+an explanation with a search alternative. Pending requests can be cancelled;
+responses arriving after cancellation, event selection or map removal are ignored.
+The button is not shown when there are no map results.
+
+Coordinates stay in page memory and disappear on reload. They are never added
+to saved plans, share links or an application backend. As with normal map panning,
+the map tile provider receives requests for the area being viewed. Browser and
+operating-system location services are governed by their own permissions.
+
 ## My Night
 
 Save or remove an event using the bookmark button on its card or the action in
@@ -99,13 +119,13 @@ history entries. Map position fits the restored results rather than restoring
 an exact camera position. Filter-panel expansion and scroll position are not
 stored.
 
-Use **Copy search link** beside the result count to share the current discovery
-view. **Copy event link** in event details creates a standalone event link,
+Use **Share search** beside the result count to share the current discovery
+view. **Share event** in event details creates a standalone event link,
 independent of discovery filters. This also works for an event outside the
 default availability window. In map cards, the small share icon sits beside the
 My Night button and retains a 44-pixel touch target and accessible label.
 
-**Copy My Night link** creates a snapshot of the available saved events. The
+**Share My Night** creates a snapshot of the available saved events. The
 recipient sees a separate **Shared night**, not their own My Night. Opening,
 refreshing or browsing that link never saves its events automatically. Individual
 Save buttons and **Add all to My Night** require an explicit action. Add all
@@ -131,18 +151,21 @@ There is no account, server-side storage or shared-plan service. The fragment
 is not sent in the page request, but anyone with the complete link can read the
 included events. Unsupported programme paths return 404; malformed or unsupported
 legacy fragments show an error without changing saved plans. My Night's ordinary
-address restores this browser's own plan; use its copy-link button to explicitly
+address restores this browser's own plan; use its share button to explicitly
 include a shared snapshot.
 
 Links grow with the number of included events. Some messaging apps may reject
 or shorten very long links; share fewer events if that happens.
 
-Copying shows a confirmation. When clipboard access is blocked or unavailable,
-a selectable link is shown for manual copying. Venue details include a Google
-Maps link using the event coordinates, or the supplied venue/address when there
-are no coordinates. The site does not request the user's location. Route planning
-is not implemented. Clicking the Culture Night name returns to the home view
-without clearing saved plans.
+Supported browsers open their native share sheet. Cancelling it does not copy
+anything or report an error. Other native-share failures offer an explicit
+**Copy link** action and a selectable link. Where native sharing is unavailable
+or cannot handle the link, the button copies instead. Copying shows a confirmation;
+blocked or unavailable clipboard access exposes a selectable link for manual copying.
+Venue details include a Google Maps link using the event coordinates, or the
+supplied venue/address when there are no coordinates. Route planning is not
+implemented. Clicking the Culture Night name returns to the home view without
+clearing saved plans.
 
 ### Stable event IDs
 
@@ -199,6 +222,11 @@ recipient-plan preservation on open/reload, explicit additive imports, unavailab
 events, confirmed replacement, custom ordering, drag/keyboard controls, invalid
 links, home navigation and clipboard fallbacks. Pure codec tests cover validation,
 stable event identities, legacy links and whole-programme link round trips.
+
+Location regressions mock geolocation, covering explicit requests, camera
+centring, accuracy, cancellation, failures and unchanged filters/storage/URLs.
+Native-sharing tests mock the operating-system share and clipboard APIs. They
+never open real share targets or use the user's actual location or clipboard.
 
 External decorative images and map tiles are replaced with a deterministic
 fixture. App code, programme data, markers, clustering and browser storage remain

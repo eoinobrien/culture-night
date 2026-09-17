@@ -58,7 +58,7 @@ test("shared My Night never auto-saves and explicit saving merges without replac
   await prepare(sender, sharedUrls);
   await sender.goto("/");
   await mine(sender).click();
-  await sender.getByRole("button", { name: "Copy My Night link", exact: true }).click();
+  await sender.getByRole("button", { name: "Share My Night", exact: true }).click();
   await expect(sender.getByRole("status").filter({ hasText: "Link copied" })).toBeVisible();
   const link = await sender.evaluate(() => window.sharingTest.copiedLink);
   expect(link).toBeTruthy();
@@ -161,7 +161,7 @@ test("event copy produces an independent permalink with booking access and no au
   }, programmeYear));
   await page.locator(".event-card").filter({ hasText: bookingEvent.title }).click();
   const popup = page.locator(".event-popup");
-  const share = popup.getByRole("button", { name: "Copy event link", exact: true });
+  const share = popup.getByRole("button", { name: "Share event", exact: true });
   await expect(share).toHaveText("");
   await expect(share.locator("svg")).toHaveCSS("width", "17px");
   await expect(popup).toHaveCSS("opacity", "1");
@@ -273,7 +273,7 @@ test("custom order persists and is shared without reordering the recipient's own
   await page.reload();
   await expect(sort).toHaveValue("custom");
   await expect(titles).toHaveText([evening.title, bookingEvent.title, singing.title]);
-  await page.getByRole("button", { name: "Copy My Night link", exact: true }).click();
+  await page.getByRole("button", { name: "Share My Night", exact: true }).click();
   const link = await page.evaluate(() => window.sharingTest.copiedLink);
   expect(readLink(link!).sort).toBe("custom");
   expect(readLink(link!).sharedUrls).toEqual([evening.url, bookingEvent.url, singing.url]);
@@ -508,7 +508,7 @@ for (const clipboard of ["denied", "missing"] as const) {
   test(`${clipboard} clipboard offers a selectable manual link`, async ({ page, baseURL }) => {
     await prepare(page, undefined, clipboard);
     await page.goto(createStateLink(baseURL!, { ...defaultUrlState(), searchTerm: "Belfast" }, programmeYear));
-    await page.getByRole("button", { name: "Copy search link", exact: true }).click();
+    await page.getByRole("button", { name: "Share search", exact: true }).click();
     const field = page.getByRole("textbox", { name: "Share link", exact: true });
     await expect(field).toBeVisible();
     const link = await field.inputValue();
