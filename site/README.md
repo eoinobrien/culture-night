@@ -74,6 +74,12 @@ matching results, rather than automatically selecting the first event. Selecting
 a card, suggestion or pin opens that event. A suggestion does not replace the
 query with its title, so other matching pins remain available.
 
+The Culture Night name returns to default Browse/List state, clears filters and
+selection, closes the filter panel and scrolls results to the top without
+reloading the document or recreating an existing map. My Night saves are unchanged,
+and Back restores the previous view. Modified clicks and opening the home link in
+another tab retain normal browser behaviour.
+
 **Available from** and **Available until** describe when you can attend. Events
 match if their opening times overlap any part of that window. An event running
 16:00-20:00 therefore matches availability of 19:00-20:00. Merely touching an

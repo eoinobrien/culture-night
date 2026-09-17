@@ -2,7 +2,7 @@ import type { Page } from "@playwright/test";
 import { test, expect } from "./fixtures";
 import events from "../src/api/events.json";
 import { programmeYear } from "../src/api/programme";
-import { createStateLink, readStateLink, encodeUrlState, defaultUrlState } from "../src/lib/url-state";
+import { createStateLink, readStateLink, encodeUrlState, defaultUrlState, type UrlState } from "../src/lib/url-state";
 import { myNightStorageKey } from "../src/lib/my-night";
 import { overlapsAvailability } from "../src/lib/event-filters";
 
@@ -478,20 +478,92 @@ test("replacement requires confirmation and affects only the current programme",
   expect(await stored(page)).toBe(JSON.stringify([bookingEvent.url, singing.url]));
 });
 
-test("the brand returns home without changing My Night and browsing has no All Ireland labels", async ({ page, baseURL, isMobile }) => {
+test("the brand resets home without reloading the document, map or My Night", async ({ page, baseURL, isMobile }) => {
   await prepare(page, [lateEvent.url]);
-  await page.goto(createStateLink(baseURL!, {
+  const sharedState: UrlState = {
     ...defaultUrlState(), collection: "shared", sharedUrls: [evening.url], sort: "custom",
-  }, programmeYear));
-  await page.getByRole("link", { name: "Culture Night home", exact: true }).click();
+    searchTerm: "Dublin", eventType: evening.eventType, bookingDetails: bookingEvent.bookingDetails,
+    ageGroup: lateEvent.ageGroup || "All", startTime: { hour: 18, minute: 15 },
+    endTime: { hour: 23, minute: 0 }, selectedUrl: evening.url, view: "map",
+  };
+  await page.goto(createStateLink(baseURL!, sharedState, programmeYear));
+  const map = page.locator(".event-map");
+  await expect(map.getByRole("heading", { name: evening.title, exact: true })).toBeVisible();
+  await map.evaluate((element) => { element.setAttribute("data-home-map", "original"); });
+  await page.locator("html").evaluate((element) => { element.setAttribute("data-home-document", "original"); });
+  const documentRequests: string[] = [];
+  page.on("request", (request) => {
+    if (request.resourceType() === "document") documentRequests.push(request.url());
+  });
+  const home = page.getByRole("link", { name: "Culture Night home", exact: true });
+  if (isMobile) await home.tap();
+  else await home.click();
   await expect(page.getByRole("combobox", { name: "Search events" })).toHaveValue("");
   await expect(page.getByRole("list", { name: "Matching event results" })).toBeVisible();
   expect(new URL(page.url()).pathname).toBe(`/1/${programmeYear}/`);
   expect(new URL(page.url()).hash).toBe("");
+  expect(readLink(page.url())).toEqual(defaultUrlState());
+  await expect(page.locator(".event-popup")).toHaveCount(0);
+  await expect(page.locator("html")).toHaveAttribute("data-home-document", "original");
+  await expect(map).toHaveAttribute("data-home-map", "original");
   expect(await stored(page)).toBe(JSON.stringify([lateEvent.url]));
   await expect(page.locator(".discovery-toolbar .scope-label")).toHaveCount(0);
-  if (isMobile) await page.getByRole("button", { name: "Map", exact: true }).tap();
+  await page.goBack();
+  await expect(page.getByRole("heading", { name: "Shared night", exact: true })).toBeVisible();
+  await expect(map.getByRole("heading", { name: evening.title, exact: true })).toBeVisible();
+  expect(readLink(page.url())).toEqual(sharedState);
+  await page.goForward();
+  await expect(page.getByRole("list", { name: "Matching event results" })).toBeVisible();
+  expect(readLink(page.url())).toEqual(defaultUrlState());
+  await expect(page.locator("html")).toHaveAttribute("data-home-document", "original");
+  await expect(map).toHaveAttribute("data-home-map", "original");
+  expect(documentRequests).toEqual([]);
+  expect(await page.evaluate(() => window.sharingTest.writes)).toBe(0);
+  expect(await stored(page)).toBe(JSON.stringify([lateEvent.url]));
   await expect(page.locator(".map-caption")).not.toContainText("All Ireland");
+});
+
+test("the brand closes filters and scrolls home with keyboard activation, including when already home", async ({ page, baseURL }) => {
+  await prepare(page, [lateEvent.url]);
+  await page.goto(createStateLink(baseURL!, { ...defaultUrlState(), searchTerm: "Dublin" }, programmeYear));
+  await expect(page.getByRole("combobox", { name: "Search events" })).toHaveValue("Dublin");
+  await page.locator("html").evaluate((element) => { element.setAttribute("data-home-document", "original"); });
+  const home = page.getByRole("link", { name: "Culture Night home", exact: true });
+  for (let visit = 0; visit < 2; visit++) {
+    await page.getByRole("button", { name: "Filters", exact: true }).click();
+    await expect(page.getByRole("region", { name: "Event filters", exact: true })).toBeVisible();
+    await page.locator(".results-panel").evaluate((element) => { element.scrollTop = 80; });
+    expect(await page.locator(".results-panel").evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+    await home.focus();
+    await home.press("Enter");
+    await expect(page.getByRole("region", { name: "Event filters", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("combobox", { name: "Search events" })).toHaveValue("");
+    await expect.poll(() => page.locator(".results-panel").evaluate((element) => element.scrollTop)).toBe(0);
+    expect(readLink(page.url())).toEqual(defaultUrlState());
+    await expect(page.locator("html")).toHaveAttribute("data-home-document", "original");
+    await expect(home).toBeFocused();
+  }
+  expect(await stored(page)).toBe(JSON.stringify([lateEvent.url]));
+  expect(await page.evaluate(() => window.sharingTest.writes)).toBe(0);
+});
+
+test("the brand keeps native modified and middle click navigation", async ({ page, context, baseURL, isMobile }) => {
+  test.skip(isMobile, "Desktop link modifiers need one keyboard/mouse project.");
+  await prepare(page, [lateEvent.url]);
+  await page.goto(createStateLink(baseURL!, { ...defaultUrlState(), collection: "my-night" }, programmeYear));
+  await expect(page.getByRole("heading", { name: "My Night", exact: true })).toBeVisible();
+  const source = page.url();
+  const home = page.getByRole("link", { name: "Culture Night home", exact: true });
+  await expect(home).toHaveAttribute("href", "./");
+  for (const options of [{ modifiers: ["ControlOrMeta" as const] }, { button: "middle" as const }]) {
+    const [newPage] = await Promise.all([context.waitForEvent("page"), home.click(options)]);
+    await expect(newPage.getByRole("combobox", { name: "Search events" })).toHaveValue("");
+    expect(readLink(newPage.url())).toEqual(defaultUrlState());
+    expect(page.url()).toBe(source);
+    await expect(page.getByRole("heading", { name: "My Night", exact: true })).toBeVisible();
+    expect(await stored(page)).toBe(JSON.stringify([lateEvent.url]));
+    await newPage.close();
+  }
 });
 
 test("unsupported programme paths do not import their shared events", async ({ page, baseURL }) => {

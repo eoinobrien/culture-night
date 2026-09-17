@@ -4,7 +4,7 @@ import { CultureNightEvent } from "@/interfaces/culture-night-event";
 import Events from "../api/events.json";
 import { programmeDate, programmeYear } from "@/api/programme";
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { Geocode } from "@/interfaces/geocode";
 import SearchBox from "@/components/SearchBox";
 import FiltersColumn from "@/components/FiltersColumn";
@@ -114,6 +114,15 @@ export default function Home() {
     update({ collection: saved ? "my-night" : "browse", view: "list", selectedUrl: undefined });
     setFiltersOpen(false);
   };
+  const goHome = (event: MouseEvent<HTMLAnchorElement>) => {
+    if (!urlReady || event.defaultPrevented || event.button !== 0 ||
+      event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    dismissTip();
+    setFiltersOpen(false);
+    update(defaultUrlState);
+    resultsPanel.current?.scrollTo({ top: 0 });
+  };
   const getEventLink = useCallback((event: CultureNightEvent) => createStateLink(window.location.href, {
     ...defaultUrlState(), collection: "event", selectedUrl: event.url, view: event.geocode ? "map" : "list",
   }, programmeYear), []);
@@ -153,7 +162,7 @@ export default function Home() {
     <main className="culture-app">
       <header className="app-header">
         <div className="app-brand">
-          <h1><a href="./" aria-label="Culture Night home">Culture Night</a></h1>
+          <h1><a href="./" aria-label="Culture Night home" onClick={goHome}>Culture Night</a></h1>
           <p>{programmeDate}</p>
         </div>
         <div className="my-night-anchor" ref={myNightAnchor}>
