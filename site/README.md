@@ -11,6 +11,58 @@ npm run dev
 
 Open <http://localhost:3000>. The static export is written to `out/`.
 
+## Offline event guide
+
+The production build saves the application and complete programme in the
+background. Keep the first visit open and connected while saving finishes.
+No account, installation or backend is required. An icon and **Offline** appear
+beside the date when the browser reports no connection. Nothing is shown while
+online. The indicator describes the connection, not a promise of permanent
+storage; its accessible description and tooltip distinguish saved data from an
+incomplete download. The programme's refresh time remains in the footer.
+
+Search, filters, full event details, My Night and supported shared links work
+after disconnecting, including reloads. My Night keeps using its existing
+programme-scoped localStorage; downloading or updating the guide does not
+replace saved events. Browser storage can be blocked, cleared or evicted.
+The cache is checked when the page becomes visible or connectivity changes.
+Missing files are repaired automatically while connected. Failed preparation
+is logged in the browser console and retried in the foreground, starting after
+30 seconds and backing off to five minutes. Reconnecting retries immediately.
+There is no download panel or manual retry control.
+
+Map tiles and remote event photographs are **not** included. Offline selections
+open full details in List, and shared Map links fall back to List without losing
+the selected event. The entire map, including pins, caption and location controls,
+is hidden offline on desktop and phones. The list uses the available width instead
+of leaving an empty map column. An existing map instance stays hidden to preserve
+its camera and selection on reconnect. The Map switch is disabled until
+connectivity returns.
+Offline cards are text-only: photographs, placeholders and their reserved space
+are removed, including in My Night and shared plans. Images return online.
+When online tiles fail, the map explains
+the failure and offers List access. The selected event's **Read event details
+without the map** section also works online when maps are slow or unavailable.
+Booking, official listings, online content and Google Maps require connectivity.
+The saved programme cannot reflect later cancellations or booking changes.
+
+`npm run build` runs `scripts/build-offline.mjs` after Next's export. It generates
+`out/sw.js` from the actual exported HTML, scripts, styles, fonts and local icons,
+including dynamically loaded map code. It does not scrape or prefetch map tiles
+or photographs. The worker serves known routes and assets from a versioned cache;
+unsupported programme paths still return 404. Failed preparation never replaces
+a complete saved release.
+
+Updates download separately while the current guide stays usable. A complete
+update waits until all Culture Night tabs have closed, then becomes active on
+the next visit. The app does not force a reload while someone is using it.
+A failed update leaves the existing guide and My Night intact.
+
+Service workers require HTTPS or a trusted localhost origin. Development mode
+does not register a worker, so `npm run dev` cannot demonstrate offline reload.
+Use the production export for offline verification. The cache is scoped to the
+site's origin and root path, matching the custom-domain deployment.
+
 ## Discovery layout
 
 The interface uses black and charcoal surfaces with pale-green map pins and
@@ -46,7 +98,8 @@ manual navigation or map removal cancels a pending automatic refit.
 Tile images use the browser's normal HTTP cache and the provider's cache headers.
 There is no service-worker tile cache, cache-busting query, proxy or offline
 prefetch. Browser caching is subject to eviction and is not an offline-map
-guarantee. Keep normal caching enabled and follow the
+guarantee. The offline event-guide worker leaves tile requests alone.
+Keep normal caching enabled and follow the
 [OSM tile policy](https://operations.osmfoundation.org/policies/tiles/).
 
 Geographic limits are not enabled. An Ireland-wide tile-layer `bounds` could
@@ -289,6 +342,25 @@ The HTML report, failure screenshots and traces are ignored by git:
 ```bash
 npx playwright show-report
 ```
+
+### Production offline regression tests
+
+```bash
+npm run build
+npm run test:offline
+```
+
+The separate offline configuration enables real service workers and serves
+temporary copies of `out/` on `127.0.0.1:3014`. It covers offline reload and
+unvisited shared links, saved-plan edits, unsupported routes, interrupted and
+corrupted downloads, missing cache entries, blocked storage and release updates.
+It also checks automatic recovery and retry backoff, the offline-only header
+indicator, inline date alignment from 320 pixels through desktop widths, and
+list-only offline layouts across disconnect, reload, resize and reconnection.
+External imagery is mocked; the worker's cache is checked to exclude tiles and
+remote photographs. The regular development suite continues to block workers.
+Do not run either browser suite concurrently with a build or another Next
+development process in this checkout.
 
 For browser changes, also check Go, Enter, suggestions, excluding filters,
 Clear and popup dismissal. Compare list counts with clustered map totals, search

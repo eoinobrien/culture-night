@@ -8,8 +8,9 @@ import SaveEventButton, { type ShortlistControls } from "./SaveEventButton";
 import type { UrlState } from "@/lib/url-state";
 import { EventOrderContext, SortableEventResult } from "./EventOrder";
 
-function EventImage({ event, priority }: { event: CultureNightEvent; priority: boolean }) {
+function EventImage({ event, priority, offline }: { event: CultureNightEvent; priority: boolean; offline: boolean }) {
   const [failed, setFailed] = useState(false);
+  if (offline) return null;
   return (
     <span className="event-image">
       {event.image && !failed ? (
@@ -35,6 +36,7 @@ function EventImage({ event, priority }: { event: CultureNightEvent; priority: b
 export default function EventResults({
   events, selectedEvent, onSelect, onClose, onClear, onReset, timeError,
   shortlist, collection = "browse", onBrowse, getEventLink, onReorder,
+  offline = false,
 }: {
   events: CultureNightEvent[];
   selectedEvent?: CultureNightEvent;
@@ -48,6 +50,7 @@ export default function EventResults({
   onBrowse?: () => void;
   getEventLink?: (event: CultureNightEvent) => string;
   onReorder?: (order: string[]) => void;
+  offline?: boolean;
 }) {
   const [limit, setLimit] = useState(30);
   const myNight = collection === "my-night";
@@ -75,17 +78,21 @@ export default function EventResults({
   }
   return (
     <>
-      {selectedEvent?.geocode && (
+      {selectedEvent?.geocode && !offline && (
         <section className="selected-result" aria-label="Selected event">
           <p>Selected event</p>
           <h3>{selectedEvent.title}</h3>
           <a href={selectedEvent.url} target="_blank" rel="noreferrer">Official event listing</a>
+          <details className="list-event-details" key={selectedEvent.url}>
+            <summary>Read event details without the map</summary>
+            <PopupEventDetails event={selectedEvent} shortlist={shortlist} getEventLink={getEventLink} />
+          </details>
         </section>
       )}
-      {selectedEvent && !selectedEvent.geocode && (
+      {selectedEvent && (!selectedEvent.geocode || offline) && (
         <section className="unmapped-details" aria-label="Selected event">
           <div className="unmapped-heading">
-            <p>No map location available</p>
+            <p>{selectedEvent.geocode ? "Selected event" : "No map location available"}</p>
             <button
               type="button"
               className="icon-button"
@@ -95,7 +102,7 @@ export default function EventResults({
               <XMarkIcon aria-hidden="true" />
             </button>
           </div>
-          <PopupEventDetails event={selectedEvent} onDismiss={() => onClose(selectedEvent.url)} shortlist={shortlist} getEventLink={getEventLink} />
+          <PopupEventDetails event={selectedEvent} onDismiss={() => onClose(selectedEvent.url)} shortlist={shortlist} getEventLink={getEventLink} offline={offline} />
         </section>
       )}
       <EventOrderContext events={events} onReorder={onReorder}>
@@ -106,11 +113,11 @@ export default function EventResults({
             <div className="event-result-main">
               <button
                 type="button"
-                className={`event-card ${index === 0 && browse ? "featured-event" : ""}`}
+                className={`event-card ${index === 0 && browse ? "featured-event" : ""} ${offline ? "text-only-event" : ""}`}
                 aria-pressed={selectedEvent?.url === event.url}
                 onClick={() => onSelect(event)}
               >
-                <EventImage event={event} priority={index === 0} />
+                <EventImage event={event} priority={index === 0} offline={offline} />
                 <span className="event-card-body">
                   <span className="event-genre">{event.genres.map((genre) => genre.title).join(" / ") || event.eventType}</span>
                   <span className="event-title">{event.title}</span>

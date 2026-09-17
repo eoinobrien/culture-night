@@ -25,6 +25,8 @@ type EventMapProps = {
   onClose: (url: string) => void;
   shortlist?: ShortlistControls;
   getEventLink?: (event: CultureNightEvent) => string;
+  offline?: boolean;
+  onShowList?: () => void;
 };
 
 function createIcon(selected: boolean) {
@@ -48,9 +50,10 @@ const clusterIcon = (cluster: L.MarkerCluster) => L.divIcon({
   iconSize: [44, 44],
 });
 
-function VisibleMapTiles() {
+function VisibleMapTiles({ offline, onFailure }: { offline: boolean; onFailure: (failed: boolean) => void }) {
   const map = useMap();
   const [visible, setVisible] = useState(false);
+  const failed = useRef(false);
   useEffect(() => {
     const container = map.getContainer();
     const update = () => setVisible(container.clientWidth > 0 && container.clientHeight > 0);
@@ -60,13 +63,27 @@ function VisibleMapTiles() {
     return () => observer.disconnect();
   }, [map]);
 
-  return visible ? (
+  return visible && !offline ? (
     <TileLayer
       attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
       url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
       className="night-tiles"
       updateWhenIdle
       updateWhenZooming={false}
+      eventHandlers={{
+        tileerror: () => {
+          if (!failed.current) console.warn("Some map tiles could not load. Event details remain available in the list.");
+          failed.current = true;
+          onFailure(true);
+        },
+        load: (event) => {
+          const layer: L.TileLayer = event.target;
+          const images = layer.getContainer()?.querySelectorAll("img");
+          const missing = Boolean(images && Array.from(images).some((image) => image.complete && image.naturalWidth === 0));
+          failed.current = missing;
+          onFailure(missing);
+        },
+      }}
     />
   ) : null;
 }
@@ -249,18 +266,23 @@ function MapController({
 }
 
 export default function EventMap({
-  position, zoom, events, selectedUrl, onSelect, onClose, shortlist, getEventLink,
+  position, zoom, events, selectedUrl, onSelect, onClose, shortlist, getEventLink, offline = false, onShowList,
 }: EventMapProps) {
   const markerRefs = useRef(new Map<string, L.Marker>());
   const clusterRef = useRef<L.MarkerClusterGroup>(null);
   const [mapError, setMapError] = useState<string>();
   const [revealedUrl, setRevealedUrl] = useState<string>();
   const [viewportRequest, setViewportRequest] = useState<MapViewportRequest>();
+  const [tilesFailed, setTilesFailed] = useState(false);
   const selectedEvent = events.find((event) => event.url === selectedUrl);
 
   return (
     <>
       {mapError && <p role="alert" className="map-error">{mapError}</p>}
+      {(offline || tilesFailed) && <div className="map-connectivity">
+        <p role="status">{offline ? "Map tiles need internet." : "Map tiles could not load."} Event details still work.</p>
+        {onShowList && <button type="button" className="text-button" onClick={onShowList}>Read event details in List</button>}
+      </div>}
       <MapContainer
         center={position}
         zoom={zoom}
@@ -270,7 +292,7 @@ export default function EventMap({
         scrollWheelZoom
         className="event-map"
       >
-        <VisibleMapTiles />
+        <VisibleMapTiles offline={offline} onFailure={setTilesFailed} />
         {/* Delayed cluster animations or marker batches can remove freshly filtered pins. */}
         <MarkerClusterGroup ref={clusterRef} animate={false} chunkedLoading={false} iconCreateFunction={clusterIcon}>
           {events.map((event) => event.geocode === null ? null : (
@@ -307,6 +329,8 @@ export default function EventMap({
               onDismiss={() => onClose(selectedEvent.url)}
               shortlist={shortlist}
               getEventLink={getEventLink}
+              offline={offline}
+              focusOnOpen={!offline}
             />
           </Popup>
         )}

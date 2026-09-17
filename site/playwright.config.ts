@@ -5,6 +5,7 @@ const baseURL = `http://127.0.0.1:${port}`;
 
 export default defineConfig({
   testDir: "./e2e",
+  testIgnore: "**/offline/**",
   fullyParallel: false,
   workers: 1,
   forbidOnly: Boolean(process.env.CI),

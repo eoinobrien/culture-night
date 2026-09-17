@@ -26,14 +26,18 @@ export default function PopupEventDetails({
   onDismiss,
   shortlist,
   getEventLink,
+  offline = false,
+  focusOnOpen: focusRequested,
 }: {
   event: CultureNightEvent;
   onDismiss?: () => void;
   shortlist?: ShortlistControls;
   getEventLink?: (event: CultureNightEvent) => string;
+  offline?: boolean;
+  focusOnOpen?: boolean;
 }) {
   const heading = useRef<HTMLElement>(null);
-  const focusOnOpen = Boolean(onDismiss);
+  const focusOnOpen = focusRequested ?? Boolean(onDismiss);
   useEffect(() => {
     if (!focusOnOpen) return;
     const previous = document.activeElement;
@@ -94,6 +98,7 @@ export default function PopupEventDetails({
           <p className="mt-3">Online content link unavailable. Check the official listing.</p>
         )}
         {!officialLink && <p className="mt-3">Official listing link unavailable.</p>}
+        {offline && <p className="online-links-notice">These details are saved. Booking, official listings and Google Maps need internet.</p>}
         <nav aria-label="Event links" className="event-links">
           {bookingLink && <a href={bookingLink} target="_blank" rel="noreferrer" className="underline">View booking</a>}
           {onlineLink && <a href={onlineLink} target="_blank" rel="noreferrer" className="underline">Online content</a>}

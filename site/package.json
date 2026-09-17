@@ -8,10 +8,12 @@
     "ids:check": "node scripts/generate-event-ids.mjs --check",
     "prebuild": "npm run ids:check",
     "build": "next build",
+    "postbuild": "node scripts/build-offline.mjs",
     "start": "next start",
     "lint": "next lint",
     "test": "tsx --tsconfig tsconfig.test.json --test tests/*.test.ts",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:offline": "playwright test --config=playwright.offline.config.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

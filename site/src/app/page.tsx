@@ -2,7 +2,7 @@
 
 import { CultureNightEvent } from "@/interfaces/culture-night-event";
 import Events from "../api/events.json";
-import { programmeDate, programmeYear } from "@/api/programme";
+import { programmeDate, programmeRefreshedAt, programmeYear } from "@/api/programme";
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { Geocode } from "@/interfaces/geocode";
@@ -18,6 +18,8 @@ import MapEmptyState from "@/components/MapEmptyState";
 import ShareLinkButton from "@/components/ShareLinkButton";
 import useUrlState from "@/hooks/useUrlState";
 import { createStateLink, defaultUrlState } from "@/lib/url-state";
+import useOfflineGuide from "@/hooks/useOfflineGuide";
+import OfflineIndicator from "@/components/OfflineIndicator";
 
 const IrelandLatLng: Geocode = { lat: 53.4230965, lng: -7.9254405 };
 const events: CultureNightEvent[] = Events;
@@ -28,6 +30,8 @@ const Map = dynamic(() => import("@/components/EventMap"), {
 });
 
 export default function Home() {
+  const offlineGuide = useOfflineGuide();
+  const { offline } = offlineGuide;
   const { state, ready: urlReady, notice: urlNotice, update } = useUrlState(events, programmeYear);
   const { startTime, endTime, eventType, bookingDetails, ageGroup, searchTerm, selectedUrl, view, collection, sharedUrls, sort } = state;
   const myNightOpen = collection === "my-night";
@@ -80,6 +84,9 @@ export default function Home() {
   useEffect(() => { if (myNightOpen) dismissTip(); }, [myNightOpen, dismissTip]);
   useEffect(() => { setConfirmReplace(false); setReplaced(false); }, [collection, sharedUrls]);
   useEffect(() => { if (confirmReplace) cancelReplace.current?.focus(); }, [confirmReplace]);
+  useEffect(() => {
+    if (offline && urlReady && view === "map") update({ view: "list" }, "replace");
+  }, [offline, urlReady, view, update]);
 
   const closeEvent = useCallback((url: string) => {
     update((current) => current.selectedUrl === url
@@ -95,8 +102,8 @@ export default function Home() {
     resultsPanel.current?.scrollTo({ top: 0 });
   };
   const selectSuggestion = (event: CultureNightEvent) => {
-    update({ selectedUrl: event.url, view: event.geocode ? "map" : "list" });
-    if (!event.geocode) resultsPanel.current?.scrollTo({ top: 0 });
+    update({ selectedUrl: event.url, view: event.geocode && !offline ? "map" : "list" });
+    if (!event.geocode || offline) resultsPanel.current?.scrollTo({ top: 0 });
   };
   const clearSearch = () => {
     update({ searchTerm: "", selectedUrl: undefined });
@@ -163,7 +170,10 @@ export default function Home() {
       <header className="app-header">
         <div className="app-brand">
           <h1><a href="./" aria-label="Culture Night home" onClick={goHome}>Culture Night</a></h1>
-          <p>{programmeDate}</p>
+          <p className="programme-date">
+            <span>{programmeDate}</span>
+            <OfflineIndicator offline={offline} ready={offlineGuide.ready} />
+          </p>
         </div>
         <div className="my-night-anchor" ref={myNightAnchor}>
         <button
@@ -183,7 +193,7 @@ export default function Home() {
       </header>
       {myNight.notice && <p role="alert" className="storage-notice">{myNight.notice}</p>}
       {urlNotice && <p role="alert" className="storage-notice">{urlNotice}</p>}
-      <div className={`discovery-workspace ${view}-view`}>
+      <div className={`discovery-workspace ${offline ? "offline-view list-view" : `${view}-view`}`}>
         <section className="discovery-sidebar" aria-label="Find events">
           <div className={`discovery-controls ${myNightOpen ? "my-night-controls" : ""}`}>
             {!browsing ? (
@@ -221,7 +231,9 @@ export default function Home() {
                 <button type="button" aria-pressed={view === "list"} onClick={() => update({ view: "list" })}>
                   <ListBulletIcon aria-hidden="true" /> List
                 </button>
-                <button type="button" aria-pressed={view === "map"} onClick={() => update({ view: "map" })}>
+                <button type="button" aria-pressed={view === "map"} disabled={offline}
+                  title={offline ? "Map tiles need internet. Event details are available in List." : undefined}
+                  onClick={() => update({ view: "map" })}>
                   <MapIcon aria-hidden="true" /> Map
                 </button>
               </div>
@@ -329,6 +341,7 @@ export default function Home() {
               getEventLink={getEventLink}
               onReorder={myNightOpen || sharedOpen ? reorderEvents : undefined}
               onBrowse={() => switchCollection(false)}
+              offline={offline}
             />
             <p className="programme-note">
               {sharedOpen
@@ -336,6 +349,7 @@ export default function Home() {
                 : myNightOpen
                 ? `${myNight.persistent ? "Saved on this browser and device only." : "Kept for this visit only."} Saving an event does not book a place. ${sort === "time" ? "After-midnight events appear last." : "Your sort choice is kept in the URL."}`
                 : `${events.length.toLocaleString("en-IE")} events in the programme. Check official listings for updates and admission details.`}
+              {" "}Programme last refreshed {programmeRefreshedAt}.
             </p>
           </div>
         </section>
@@ -360,6 +374,11 @@ export default function Home() {
                 onClose={closeEvent}
                 shortlist={shortlist}
                 getEventLink={getEventLink}
+                offline={offline}
+                onShowList={() => {
+                  update({ view: "list" });
+                  resultsPanel.current?.scrollTo({ top: 0 });
+                }}
               />
             </>
           ) : (
