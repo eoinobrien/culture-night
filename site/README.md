@@ -56,11 +56,29 @@ Unmapped events expose the same details in the list.
 ## My Night
 
 Save or remove an event using the bookmark button on its card or the action in
-its popup. My Night shows saved events in start-time order, with after-midnight
-events last, and can show just those events on the map. Discovery searches and
+its popup. My Night opens in start-time order, with after-midnight events last,
+and can show just those events on the map. Each event card has an attached
+**Reorder** handle and up/down arrows, visible in every sort mode. Moving an event
+uses the currently displayed order and automatically switches to **Custom order**.
+That order stays active until you select **Start time**, **Title** or another sort.
+The handles also support Space, arrow keys, Space to drop and Escape to cancel.
+Cancelled or unchanged drags do not change the sort or saved plan.
+Custom ordering is kept with the saved list; the chosen sort is kept in the URL.
+Discovery searches and
 filters do not hide saved events; returning to Browse restores those controls.
 Booking links and complete event details remain available from each selection.
 Saving an event does not reserve or book a place.
+
+After the first explicit save to an empty plan, a small tip beside **My Night**
+explains custom ordering and sharing. It does not move focus or block other
+controls. Dismiss it with its close button, Escape, clicking or focusing elsewhere, or by
+opening My Night. A separate programme-scoped `:tip-seen` storage flag prevents
+repeat tips after later saves and reloads. If storage is unavailable, it is shown
+at most once per visit. Opening a shared link or restoring saved data never
+triggers the tip or writes this flag.
+
+My Night's compact header keeps its title, count and share action together, with
+Browse and List/Map controls underneath. Storage warnings remain visible.
 
 The shortlist stores event URLs in this browser's `localStorage`, under
 `culture-night:my-night:v1:<programme year>`. It survives refreshes and synchronises
@@ -72,9 +90,75 @@ If storage is blocked, full or unreadable, the page shows a warning and keeps
 changes for the current visit only. Unreadable stored data is not automatically
 overwritten. The initial empty render never writes over a stored shortlist.
 
-Geolocation, route planning and persisted/shareable search or filter state are
-not implemented. Event identity uses the official URL in application state;
-it does not imply browser-URL persistence.
+## Sharing and restored state
+
+Search, availability, event-type, booking and age filters, List/Map view, sorting
+and the selected event restore from the URL on reload and browser Back/Forward.
+Live search replaces the current history entry; explicit navigation creates
+history entries. Map position fits the restored results rather than restoring
+an exact camera position. Filter-panel expansion and scroll position are not
+stored.
+
+Use **Copy search link** beside the result count to share the current discovery
+view. **Copy event link** in event details creates a standalone event link,
+independent of discovery filters. This also works for an event outside the
+default availability window. In map cards, the small share icon sits beside the
+My Night button and retains a 44-pixel touch target and accessible label.
+
+**Copy My Night link** creates a snapshot of the available saved events. The
+recipient sees a separate **Shared night**, not their own My Night. Opening,
+refreshing or browsing that link never saves its events automatically. Individual
+Save buttons and **Add all to My Night** require an explicit action. Add all
+merges available events with existing saves and never removes or replaces them.
+**Replace My Night** is a separate action beside Add all. It requires confirmation
+before replacing the current programme's saved list. Cancelling changes nothing,
+and a shared plan with no available events cannot replace an existing plan.
+Unavailable shared events are reported and are not imported.
+
+Shared links preserve the chosen sort and exact custom sequence. Reordering a
+shared preview also switches it to Custom order and changes its URL, not the
+recipient's own My Night. The snapshot
+does not update when either person later edits their own saved plan.
+
+Links use `/1/2026/#...`: the path identifies the format version and programme
+year, and the fragment holds the view or shared plan. The build exports that path
+as real static HTML. Shared events use compact stable IDs in one ordered,
+comma-separated field, for example `shared=~3BlgRkGR,~_ykpj-PD`. IDs are not
+positions in the programme array. Repeated `shared` fields are rejected; that
+earlier local format was not published.
+
+There is no account, server-side storage or shared-plan service. The fragment
+is not sent in the page request, but anyone with the complete link can read the
+included events. Unsupported programme paths return 404; malformed or unsupported
+legacy fragments show an error without changing saved plans. My Night's ordinary
+address restores this browser's own plan; use its copy-link button to explicitly
+include a shared snapshot.
+
+Links grow with the number of included events. Some messaging apps may reject
+or shorten very long links; share fewer events if that happens.
+
+Copying shows a confirmation. When clipboard access is blocked or unavailable,
+a selectable link is shown for manual copying. Venue details include a Google
+Maps link using the event coordinates, or the supplied venue/address when there
+are no coordinates. The site does not request the user's location. Route planning
+is not implemented. Clicking the Culture Night name returns to the home view
+without clearing saved plans.
+
+### Stable event IDs
+
+`src/api/event-ids.json` is an append-only registry of public event URLs and their
+compact IDs. After refreshing event data, run:
+
+```bash
+npm run ids:generate
+```
+
+The generator derives an eight-character ID from each canonical event URL and
+checks for collisions. Existing and retired mappings are retained, so reordering
+or refreshing the dataset does not repoint an existing link. Do not regenerate
+IDs from array indices or remove historical registry entries.
+`npm run build` checks the registry before exporting the site; CI uses the same
+build command.
 
 ## Checks
 
@@ -109,6 +193,12 @@ selection, empty-state recovery, My Night saving, refresh, chronological order,
 booking links, removal, cross-tab updates and storage failures. Unit tests cover
 after-midnight start ordering; the current programme has no events starting
 between midnight and 03:00.
+
+Sharing regressions cover URL restoration, history, standalone event links,
+recipient-plan preservation on open/reload, explicit additive imports, unavailable
+events, confirmed replacement, custom ordering, drag/keyboard controls, invalid
+links, home navigation and clipboard fallbacks. Pure codec tests cover validation,
+stable event identities, legacy links and whole-programme link round trips.
 
 External decorative images and map tiles are replaced with a deterministic
 fixture. App code, programme data, markers, clustering and browser storage remain

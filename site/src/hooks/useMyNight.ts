@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { MyNightDataError, myNightStorageKey, readSavedUrls, toggleSavedUrl } from "@/lib/my-night";
+import { mergeSavedUrls, MyNightDataError, myNightStorageKey, readSavedUrls, reorderSavedUrls, toggleSavedUrl } from "@/lib/my-night";
 
 type MyNightState = {
   urls: string[];
@@ -20,7 +20,11 @@ function storageNotice(error: unknown): string {
 
 export default function useMyNight(year: number) {
   const key = myNightStorageKey(year);
+  const tipKey = `${key}:tip-seen`;
   const [state, setState] = useState<MyNightState>({ urls: [], ready: false, persistent: false });
+  const [showTip, setShowTip] = useState(false);
+  const tipShown = useRef(false);
+  const dismissTip = useCallback(() => setShowTip(false), []);
   const current = useRef(state);
   const publish = useCallback((next: MyNightState) => {
     current.current = next;
@@ -28,6 +32,8 @@ export default function useMyNight(year: number) {
   }, []);
 
   useEffect(() => {
+    tipShown.current = false;
+    setShowTip(false);
     let storage: Storage;
     try {
       storage = window.localStorage;
@@ -39,7 +45,9 @@ export default function useMyNight(year: number) {
     const refresh = (event: StorageEvent) => {
       if (event.storageArea !== storage || (event.key !== key && event.key !== null) || !current.current.persistent) return;
       try {
-        publish({ urls: readSavedUrls(storage, key), ready: true, persistent: true });
+        const urls = readSavedUrls(storage, key);
+        if (!urls.length) setShowTip(false);
+        publish({ urls, ready: true, persistent: true });
       } catch (error) {
         publish({ ...current.current, persistent: false, notice: storageNotice(error) });
       }
@@ -75,14 +83,33 @@ export default function useMyNight(year: number) {
         notice = storageNotice(error);
       }
     }
+    if (nextUrls.length === 0) {
+      setShowTip(false);
+    } else if (urls.length === 0 && !tipShown.current) {
+      tipShown.current = true;
+      let seen = false;
+      if (persistent && storage) {
+        try {
+          seen = storage.getItem(tipKey) === "1";
+          if (!seen) storage.setItem(tipKey, "1");
+        } catch (error) {
+          if (!(error instanceof DOMException)) throw error;
+          console.warn("Could not remember the My Night tip. It may appear again on a later visit.", error);
+        }
+      }
+      if (!seen) setShowTip(true);
+    }
     publish({ urls: nextUrls, ready: true, persistent, notice });
-  }, [key, publish]);
+  }, [key, tipKey, publish]);
 
   const toggle = useCallback((url: string) => update((urls) => toggleSavedUrl(urls, url)), [update]);
+  const add = useCallback((urls: readonly string[]) => update((saved) => mergeSavedUrls(saved, urls)), [update]);
+  const reorder = useCallback((urls: readonly string[]) => update((saved) => reorderSavedUrls(saved, urls)), [update]);
+  const replace = useCallback((urls: readonly string[]) => update(() => [...new Set(urls)]), [update]);
   const remove = useCallback((removed: readonly string[]) => {
     const removals = new Set(removed);
     update((urls) => urls.filter((url) => !removals.has(url)));
   }, [update]);
 
-  return { ...state, toggle, remove };
+  return { ...state, toggle, add, reorder, replace, remove, showTip, dismissTip };
 }

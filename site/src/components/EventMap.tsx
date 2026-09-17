@@ -22,6 +22,7 @@ type EventMapProps = {
   onSelect: (url: string) => void;
   onClose: (url: string) => void;
   shortlist?: ShortlistControls;
+  getEventLink?: (event: CultureNightEvent) => string;
 };
 
 function createIcon(selected: boolean) {
@@ -163,26 +164,35 @@ function MapController({
         onReveal(selectedUrl);
       }
     };
-    try {
-      // List selection makes a previously hidden phone map visible in this render.
-      map.invalidateSize({ pan: false });
-      const cluster = clusterRef.current;
-      if (cluster) cluster.zoomToShowLayer(marker, open);
-      else {
-        map.setView(marker.getLatLng(), 17);
-        open();
+    const container = map.getContainer();
+    let started = false;
+    const reveal = () => {
+      if (started || !container.clientWidth || !container.clientHeight) return;
+      started = true;
+      try {
+        // A restored List view may keep the selected event's phone map hidden.
+        map.invalidateSize({ pan: false });
+        const cluster = clusterRef.current;
+        if (cluster) cluster.zoomToShowLayer(marker, open);
+        else {
+          map.setView(marker.getLatLng(), 17);
+          open();
+        }
+      } catch (error) {
+        console.error("Could not open the selected event on the map.", error);
+        onError("Could not open this event on the map. Switch to List for its official listing.");
       }
-    } catch (error) {
-      console.error("Could not open the selected event on the map.", error);
-      onError("Could not open this event on the map. Switch to List for its official listing.");
-    }
-    return () => { cancelled = true; };
+    };
+    const observer = new ResizeObserver(reveal);
+    observer.observe(container);
+    reveal();
+    return () => { cancelled = true; observer.disconnect(); };
   }, [selectedEvent, markerRefs, clusterRef, map, onError, onReveal]);
   return null;
 }
 
 export default function EventMap({
-  position, zoom, events, selectedUrl, onSelect, onClose, shortlist,
+  position, zoom, events, selectedUrl, onSelect, onClose, shortlist, getEventLink,
 }: EventMapProps) {
   const markerRefs = useRef(new Map<string, L.Marker>());
   const clusterRef = useRef<L.MarkerClusterGroup>(null);
@@ -205,7 +215,8 @@ export default function EventMap({
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           className="night-tiles"
         />
-        <MarkerClusterGroup ref={clusterRef} chunkedLoading iconCreateFunction={clusterIcon}>
+        {/* Delayed cluster animations or marker batches can remove freshly filtered pins. */}
+        <MarkerClusterGroup ref={clusterRef} animate={false} chunkedLoading={false} iconCreateFunction={clusterIcon}>
           {events.map((event) => event.geocode === null ? null : (
             <Marker
               key={event.url}
@@ -239,6 +250,7 @@ export default function EventMap({
               event={selectedEvent}
               onDismiss={() => onClose(selectedEvent.url)}
               shortlist={shortlist}
+              getEventLink={getEventLink}
             />
           </Popup>
         )}

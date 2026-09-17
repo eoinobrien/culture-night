@@ -105,6 +105,16 @@ test("suggestion selection from the initial list reveals the event without openi
   await expect(page.locator(".leaflet-popup")).toHaveCount(1);
 });
 
+test("rapid filtering during initial Map loading leaves only the current event selectable", async ({ page }) => {
+  const map = await showMap(page);
+  const search = page.getByRole("combobox", { name: "Search events" });
+  for (const query of ["Belfast", "Dublin", eventTitle]) await search.fill(query);
+  await search.press("Escape");
+  await expect(page.getByRole("status").filter({ hasText: /^1 event$/ })).toBeVisible();
+  await expect(map.getByRole("button", { name: eventTitle, exact: true })).toBeVisible();
+  await expect(map.locator(".leaflet-marker-icon")).toHaveCount(1);
+});
+
 test("empty Map replaces stale details and map controls with bounded recovery actions", async ({ page }, testInfo) => {
   const search = page.getByRole("combobox", { name: "Search events" });
   await search.fill(eventTitle);

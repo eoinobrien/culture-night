@@ -91,6 +91,10 @@ test("saving from a popup leaves it open and survives List/Map switching", async
   await expect(popup.getByRole("button", { name: `Remove ${evening.title} from My Night`, exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect(myNightButton(page)).toHaveAccessibleName("My Night, 1 saved event");
   await expect(popup.getByRole("heading", { name: evening.title, exact: true })).toBeVisible();
+  await expect(page.getByRole("region", { name: "My Night tip", exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("region", { name: "My Night tip", exact: true })).toHaveCount(0);
+  await expect(popup.getByRole("heading", { name: evening.title, exact: true })).toBeVisible();
   await activate(myNightButton(page), isMobile);
   await expect(page.getByRole("list", { name: "Saved event results" }).locator(".event-title")).toHaveText([evening.title]);
   await testInfo.attach("my-night-list", { body: await page.screenshot(), contentType: "image/png" });
@@ -102,6 +106,39 @@ test("saving from a popup leaves it open and survives List/Map switching", async
   }
   await page.reload();
   await expect(myNightButton(page)).toHaveAccessibleName("My Night, 1 saved event");
+});
+
+test("the first-save tip explains customising and sharing without stealing focus or repeating", async ({ page, isMobile }) => {
+  await page.goto("/");
+  const tip = page.getByRole("region", { name: "My Night tip", exact: true });
+  await expect(myNightButton(page)).toBeEnabled();
+  await expect(tip).toHaveCount(0);
+  expect(await page.evaluate((key) => localStorage.getItem(`${key}:tip-seen`), key)).toBeNull();
+  await findEvent(page, evening.title, isMobile);
+  await activate(saveButton(page, evening.title), isMobile);
+  await expect(tip).toBeVisible();
+  await expect(tip).toContainText("Open My Night to customise the order and share your plan.");
+  await expect(myNightButton(page)).toHaveAttribute("aria-describedby", "my-night-tip-message");
+  await expect(page.getByRole("button", { name: "Dismiss My Night tip", exact: true })).not.toBeFocused();
+  const geometry = await tip.evaluate((element) => {
+    const box = element.getBoundingClientRect();
+    const close = element.querySelector("button")!;
+    return { inside: box.left >= 0 && box.right <= innerWidth && box.top >= 0 && box.bottom <= innerHeight,
+      width: close.offsetWidth, height: close.offsetHeight };
+  });
+  expect(geometry.inside).toBe(true);
+  expect(geometry.width).toBeGreaterThanOrEqual(44);
+  expect(geometry.height).toBeGreaterThanOrEqual(44);
+  await activate(page.getByRole("button", { name: "Dismiss My Night tip", exact: true }), isMobile);
+  await expect(tip).toHaveCount(0);
+  await expect(myNightButton(page)).toBeFocused();
+  expect(await page.evaluate((key) => localStorage.getItem(`${key}:tip-seen`), key)).toBe("1");
+  await activate(removeButton(page, evening.title), isMobile);
+  await page.reload();
+  await expect(myNightButton(page)).toHaveAccessibleName("My Night, 0 saved events");
+  await activate(saveButton(page, evening.title), isMobile);
+  await expect(myNightButton(page)).toHaveAccessibleName("My Night, 1 saved event");
+  await expect(tip).toHaveCount(0);
 });
 
 test("changes synchronise between tabs and storage clearing removes the shortlist", async ({ page, context, isMobile }) => {
@@ -129,6 +166,8 @@ test("restoration is programme-scoped and unavailable saved events can be remove
   }, { key, oldKey: myNightStorageKey(programmeYear - 1), url: evening.url });
   await page.goto("/");
   await expect(myNightButton(page)).toHaveAccessibleName("My Night, 1 saved event");
+  await expect(page.getByRole("region", { name: "My Night tip", exact: true })).toHaveCount(0);
+  expect(await page.evaluate((key) => localStorage.getItem(`${key}:tip-seen`), key)).toBeNull();
   await activate(myNightButton(page), isMobile);
   await expect(page.getByRole("list", { name: "Saved event results" }).locator(".event-title")).toHaveText([evening.title]);
   await expect(page.getByText("1 saved event is no longer in this programme.", { exact: true })).toBeVisible();
@@ -163,7 +202,7 @@ for (const failure of ["blocked", "full", "malformed"] as const) {
     await expect(myNightButton(page)).toHaveAccessibleName("My Night, 1 saved event");
     await activate(myNightButton(page), isMobile);
     await expect(page.getByRole("list", { name: "Saved event results" }).locator(".event-title")).toHaveText([evening.title]);
-    await expect(page.getByText("Kept for this visit only. Ordered by start time.", { exact: true })).toBeVisible();
+    await expect(page.locator(".programme-note")).toContainText("Kept for this visit only.");
     if (failure === "malformed") {
       expect(await page.evaluate((key) => localStorage.getItem(key), key)).toBe("{unreadable");
     }

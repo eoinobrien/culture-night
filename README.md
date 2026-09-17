@@ -6,7 +6,9 @@ An unofficial map of Culture Night events across Ireland, published at
 Search for events, venues, hosts, locations, or genres; filter by time, event type,
 booking requirements, and age group; and select an event to see its details on the
 map. Event links lead back to the official programme for current booking and
-accessibility information.
+accessibility information. My Night keeps a browser-local plan with custom
+ordering. Shareable URLs carry snapshots without automatically saving or replacing
+the recipient's plan.
 
 Culture Night 2026 takes place on **Friday 18 September 2026**. The map uses a saved
 snapshot of the [official event listings](https://culturenight.ie/events/), not a
@@ -38,6 +40,7 @@ OpenStreetMap tiles. Next.js exports a static site to `site/out/`.
 | --- | --- |
 | `site/` | Web application |
 | `site/src/api/events.json` | Event data bundled into the site |
+| `site/src/api/event-ids.json` | Stable compact IDs for shared event links |
 | `site/src/api/programme.json` | Programme date, source, refresh time, and coverage |
 | `scripts/` | Event scraper, geocoding step, and intermediate datasets |
 | `.github/workflows/nextjs.yml` | GitHub Pages build and deployment |
@@ -71,6 +74,16 @@ Scraping writes `scripts/data.json`, `scripts/enrichedData.json`, and
 `scripts/programme.json` only after all listing and detail pages succeed.
 Geocoding then writes `scripts/geocodedEvents.json` and the site's event and
 programme JSON files. Review those changes and rebuild the site before publishing.
+Update the append-only ID registry before building:
+
+```bash
+cd ../site
+npm run ids:generate
+npm run build
+```
+
+Keep retired ID mappings so existing shared links are never reassigned to a
+different event. The build checks the registry and fails if it needs updating.
 
 Events without a unique map location remain searchable but do not get a marker.
 The import logs these events and lists them in `site/src/api/programme.json`.

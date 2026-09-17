@@ -2,6 +2,7 @@ import type { CultureNightEvent } from "../interfaces/culture-night-event";
 import { programmeMinutes } from "./event-filters";
 
 export const myNightStorageKey = (year: number) => `culture-night:my-night:v1:${year}`;
+export type MyNightSort = "time" | "title" | "custom";
 
 export class MyNightDataError extends Error {}
 
@@ -25,14 +26,38 @@ export function toggleSavedUrl(urls: readonly string[], url: string): string[] {
   return urls.includes(url) ? urls.filter((saved) => saved !== url) : [...urls, url];
 }
 
+export function mergeSavedUrls(urls: readonly string[], additions: readonly string[]): string[] {
+  return [...new Set([...urls, ...additions])];
+}
+
+export function reorderSavedUrls(urls: readonly string[], order: readonly string[]): string[] {
+  const existing = new Set(urls);
+  const requested = new Set(order);
+  return [...new Set(order)].filter((url) => existing.has(url)).concat([...existing].filter((url) => !requested.has(url)));
+}
+
 export function savedEventsInTimeOrder(
   events: CultureNightEvent[],
   urls: readonly string[]
 ): CultureNightEvent[] {
+  return savedEventsInOrder(events, urls, "time");
+}
+
+export function savedEventsInOrder(
+  events: CultureNightEvent[],
+  urls: readonly string[],
+  sort: MyNightSort
+): CultureNightEvent[] {
   const saved = new Set(urls);
-  return events.filter((event) => saved.has(event.url)).sort((a, b) =>
-    programmeMinutes(a.startTime) - programmeMinutes(b.startTime) ||
-    a.title.localeCompare(b.title, "en-IE") ||
-    a.url.localeCompare(b.url)
-  );
+  const selected = events.filter((event) => saved.has(event.url));
+  if (sort === "custom") {
+    const byUrl = new Map(selected.map((event) => [event.url, event]));
+    return [...saved].flatMap((url) => {
+      const event = byUrl.get(url);
+      return event ? [event] : [];
+    });
+  }
+  return selected.sort((a, b) =>
+    (sort === "time" ? programmeMinutes(a.startTime) - programmeMinutes(b.startTime) : 0) ||
+    a.title.localeCompare(b.title, "en-IE") || a.url.localeCompare(b.url));
 }

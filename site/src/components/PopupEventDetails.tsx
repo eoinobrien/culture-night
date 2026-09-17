@@ -8,6 +8,7 @@ import {
 import PopupDetail from "./PopupDetail";
 import { useEffect, useRef } from "react";
 import SaveEventButton, { type ShortlistControls } from "./SaveEventButton";
+import ShareLinkButton from "./ShareLinkButton";
 
 function webLink(value: string | null): string | undefined {
   if (!value) return undefined;
@@ -24,10 +25,12 @@ export default function PopupEventDetails({
   event,
   onDismiss,
   shortlist,
+  getEventLink,
 }: {
   event: CultureNightEvent;
   onDismiss?: () => void;
   shortlist?: ShortlistControls;
+  getEventLink?: (event: CultureNightEvent) => string;
 }) {
   const heading = useRef<HTMLElement>(null);
   const focusOnOpen = Boolean(onDismiss);
@@ -45,6 +48,10 @@ export default function PopupEventDetails({
   const bookingLink = webLink(event.bookingLink);
   const onlineLink = webLink(event.onlineContentLink);
   const officialLink = webLink(event.url);
+  const locationQuery = event.geocode
+    ? `${event.geocode.lat},${event.geocode.lng}`
+    : [event.venueName, event.fullAddress].filter(Boolean).join(", ");
+  const mapsLink = locationQuery ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationQuery)}` : undefined;
   return (
     <article
       className="event-details min-w-0 text-left text-sm"
@@ -64,10 +71,20 @@ export default function PopupEventDetails({
         <h2 className="text-xl font-bold [overflow-wrap:anywhere]">{event.title}</h2>
       </header>
       <div className="event-details-body" tabIndex={0} aria-label="Event details">
-        {shortlist && <SaveEventButton event={event} shortlist={shortlist} />}
+        {(shortlist || getEventLink) && (
+          <div className="event-details-actions">
+            {shortlist && <SaveEventButton event={event} shortlist={shortlist} />}
+            {getEventLink && <ShareLinkButton compact label="Copy event link" identity={event.url} getLink={() => getEventLink(event)} />}
+          </div>
+        )}
         <dl className="event-essentials">
           {event.time && <PopupDetail label="Time" icon={<ClockIcon />} text={event.time} />}
-          {event.venueName && <PopupDetail label="Venue" icon={<MapPinIcon />} text={event.venueName} />}
+          {(event.venueName || event.fullAddress) && (
+            <PopupDetail label="Venue" icon={<MapPinIcon />} text={event.venueName || event.fullAddress}>
+              {mapsLink && <a href={mapsLink} target="_blank" rel="noreferrer" className="venue-map-link"
+                aria-label={`Open ${event.venueName || event.title} in Google Maps`}>Google Maps</a>}
+            </PopupDetail>
+          )}
           {event.bookingDetails && <PopupDetail label="Booking" icon={<TicketIcon />} text={event.bookingDetails} />}
         </dl>
         {!bookingLink && (event.bookingLink || event.bookingDetails.toLowerCase() === "booking required") && (
