@@ -48,6 +48,29 @@ const clusterIcon = (cluster: L.MarkerCluster) => L.divIcon({
   iconSize: [44, 44],
 });
 
+function VisibleMapTiles() {
+  const map = useMap();
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const container = map.getContainer();
+    const update = () => setVisible(container.clientWidth > 0 && container.clientHeight > 0);
+    const observer = new ResizeObserver(update);
+    observer.observe(container);
+    update();
+    return () => observer.disconnect();
+  }, [map]);
+
+  return visible ? (
+    <TileLayer
+      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+      className="night-tiles"
+      updateWhenIdle
+      updateWhenZooming={false}
+    />
+  ) : null;
+}
+
 function FitResults({ events, selectedUrl, viewportRequest }: Pick<EventMapProps, "events" | "selectedUrl"> & {
   viewportRequest?: MapViewportRequest;
 }) {
@@ -60,12 +83,18 @@ function FitResults({ events, selectedUrl, viewportRequest }: Pick<EventMapProps
     if (requested) handledRequest.current = viewportRequest;
     const container = map.getContainer();
     const points = events.flatMap((event) => event.geocode ? [L.latLng(event.geocode)] : []);
+    const debounce = !requested && fittedEvents.current !== null;
+    let ready = !debounce;
     let frame = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     let fitted = false;
+    let cancelled = false;
     const fit = () => {
+      if (!ready || cancelled) return;
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
-        if (!container.clientWidth || !container.clientHeight || fitted) return;
+        if (!container.clientWidth || !container.clientHeight || fitted || cancelled) return;
+        fitted = true;
         map.invalidateSize({ pan: false });
         if (requested && viewportRequest.location) {
           const location = viewportRequest.location;
@@ -75,16 +104,28 @@ function FitResults({ events, selectedUrl, viewportRequest }: Pick<EventMapProps
         } else if (points.length) {
           map.fitBounds(L.latLngBounds(points), { padding: [44, 56], maxZoom: 14, animate: false });
         }
-        fitted = true;
         fittedEvents.current = events;
       });
     };
+    const cancelPendingFit = () => {
+      if (fitted) return;
+      cancelled = true;
+      clearTimeout(timer);
+      cancelAnimationFrame(frame);
+    };
     const observer = new ResizeObserver(fit);
     observer.observe(container);
-    fit();
+    if (debounce) {
+      map.on("movestart", cancelPendingFit);
+      timer = setTimeout(() => { ready = true; fit(); }, 300);
+    } else {
+      fit();
+    }
     return () => {
+      clearTimeout(timer);
       cancelAnimationFrame(frame);
       observer.disconnect();
+      map.off("movestart", cancelPendingFit);
     };
   }, [events, selectedUrl, map, viewportRequest]);
   return null;
@@ -223,15 +264,13 @@ export default function EventMap({
       <MapContainer
         center={position}
         zoom={zoom}
+        // Clustering needs the existing tile zoom limit even while tiles are hidden.
+        maxZoom={18}
         zoomSnap={0.25}
         scrollWheelZoom
         className="event-map"
       >
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          className="night-tiles"
-        />
+        <VisibleMapTiles />
         {/* Delayed cluster animations or marker batches can remove freshly filtered pins. */}
         <MarkerClusterGroup ref={clusterRef} animate={false} chunkedLoading={false} iconCreateFunction={clusterIcon}>
           {events.map((event) => event.geocode === null ? null : (

@@ -37,6 +37,15 @@ test("attendance details and description are complete, with supplied actions", (
   assert.ok(html.includes("Full description"));
 });
 
+test("booking status remains visible without a repeated visible label", () => {
+  for (const bookingDetails of ["No Booking Required", "Booking Required"]) {
+    const html = render({ ...sample, bookingDetails });
+    assert.ok(html.includes("popup-detail-inline"));
+    assert.ok(html.includes('<span class="sr-only">Booking</span>'));
+    assert.ok(new RegExp(`<dd[^>]*>${bookingDetails}</dd>`).test(html));
+  }
+});
+
 test("absent booking links and optional fields are not invented", () => {
   const html = render({
     ...sample, bookingLink: null, onlineContentLink: null, features: [],

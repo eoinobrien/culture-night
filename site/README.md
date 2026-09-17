@@ -26,6 +26,45 @@ Results render in batches of 30, with Show more exposing the remaining matches.
 When no results have a map location, Map view shows a scrollable empty state
 with recovery actions instead of an empty map and misleading zoom controls.
 
+## Map tiles and caching
+
+Leaflet loads raster tiles directly from
+`https://tile.openstreetmap.org/{z}/{x}/{y}.png`, with visible OpenStreetMap
+attribution. The tile layer is attached only while the map has a visible,
+non-zero-sized container. A phone's hidden List-view map makes no tile requests,
+including after filtering or resizing. Hiding removes only the tile layer, not
+the map instance, selected event or location state. The existing maximum zoom of
+18 is explicit so clustering also works without the tile layer.
+
+Panning loads fresh tiles after movement ends. Continuous pinch/fly-to zooms skip
+intermediate tile levels. Subsequent automatic camera refits wait for 300 ms
+without another result change, so typing does not refit the map on every key.
+The result list, filtered pins and URL still update immediately. Initial fitting,
+selecting an event and Near me are not debounced. Newer selection, location,
+manual navigation or map removal cancels a pending automatic refit.
+
+Tile images use the browser's normal HTTP cache and the provider's cache headers.
+There is no service-worker tile cache, cache-busting query, proxy or offline
+prefetch. Browser caching is subject to eviction and is not an offline-map
+guarantee. Keep normal caching enabled and follow the
+[OSM tile policy](https://operations.osmfoundation.org/policies/tiles/).
+
+Geographic limits are not enabled. An Ireland-wide tile-layer `bounds` could
+exclude tiles wholly outside a padded island-wide rectangle, with map navigation
+bounds as a separate control. Boundary tiles would still contain neighbouring
+areas. Any restriction needs to account for offshore events and Near me requests
+outside the supported area.
+
+For a future self-hosted vector map, obtain a permitted regional extract rather
+than archiving OSM's public raster or vector servers. Geofabrik offers an
+[experimental Ireland and Northern Ireland Shortbread vector package](https://download.geofabrik.de/europe/ireland-and-northern-ireland.html).
+[PMTiles](https://github.com/protomaps/PMTiles) can package a regional tileset for
+on-demand access without downloading the whole archive to each visitor. Hosting
+needs HTTP Range support and appropriate CORS; the renderer and style must match
+the vector schema. The [Protomaps Leaflet vector renderer](https://github.com/protomaps/protomaps-leaflet)
+is in maintenance mode and recommends MapLibre for new projects. No vector
+migration or archive download is implemented.
+
 ## Search and availability
 
 The list, map, result count and search suggestions use the same query, event-type,
@@ -50,6 +89,10 @@ search and selection; closing a popup does not reopen it when the query changes.
 Popups show time, venue, booking status and supplied links first. Address, age,
 accessibility and the full description are expandable. The header and body scroll
 independently when necessary, with a 44-pixel close action and no modal backdrop.
+Essentials use compact line spacing. Google Maps sits beside the venue's label
+and value without enlarging its text line, and booking shows its status once
+with a visually hidden semantic label. Interactive targets remain at least
+44 pixels high. The transparent close button is inset inside the card border.
 Selection survives switching between List and Map and resizing the viewport.
 Unmapped events expose the same details in the list.
 
@@ -227,6 +270,10 @@ Location regressions mock geolocation, covering explicit requests, camera
 centring, accuracy, cancellation, failures and unchanged filters/storage/URLs.
 Native-sharing tests mock the operating-system share and clipboard APIs. They
 never open real share targets or use the user's actual location or clipboard.
+Tile-loading regressions count mocked tile requests, checking zero requests for
+hidden maps, the canonical hostname, breakpoint changes and restored selections.
+Controlled-clock cases cover the 300 ms refit threshold, cancellation by newer
+actions, drag-end loading and continuous touch zoom without intermediate tiles.
 
 External decorative images and map tiles are replaced with a deterministic
 fixture. App code, programme data, markers, clustering and browser storage remain

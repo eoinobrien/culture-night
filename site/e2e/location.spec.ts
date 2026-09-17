@@ -88,6 +88,14 @@ test("Near me locates once, centres the map and never changes filters, URLs or s
   expect(page.url()).toBe(beforeUrl);
   expect(await page.evaluate(() => ({ ...localStorage }))).toEqual(beforeStorage);
   await testInfo.attach("near-me-map", { body: await page.screenshot(), contentType: "image/png" });
+  if (isMobile) {
+    await page.getByRole("button", { name: "List", exact: true }).click();
+    await expect(map(page)).toBeHidden();
+    await page.getByRole("button", { name: "Map", exact: true }).click();
+    await expect(map(page).locator(".user-location")).toBeInViewport({ ratio: 1 });
+    expect(await page.evaluate(() => window.locationTest.calls)).toBe(1);
+    expect(page.url()).toBe(beforeUrl);
+  }
   await page.getByRole("combobox", { name: "Search events" }).fill(event.title);
   await expect(map(page).getByRole("button", { name: event.title, exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Clear location and show all results" }).click();

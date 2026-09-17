@@ -85,7 +85,7 @@ export default function PopupEventDetails({
                 aria-label={`Open ${event.venueName || event.title} in Google Maps`}>Google Maps</a>}
             </PopupDetail>
           )}
-          {event.bookingDetails && <PopupDetail label="Booking" icon={<TicketIcon />} text={event.bookingDetails} />}
+          {event.bookingDetails && <PopupDetail label="Booking" hideLabel icon={<TicketIcon />} text={event.bookingDetails} />}
         </dl>
         {!bookingLink && (event.bookingLink || event.bookingDetails.toLowerCase() === "booking required") && (
           <p className="mt-3">No booking link available. Check the official listing for how to book.</p>
@@ -102,7 +102,7 @@ export default function PopupEventDetails({
         {(event.host || event.fullAddress || event.ageGroup || event.features.length > 0) && (
           <details>
             <summary>Address, age and accessibility</summary>
-            <dl className="grid gap-3 py-2">
+            <dl className="grid gap-2 py-2">
               {event.host && <PopupDetail label="Host" icon={<UserIcon />} text={event.host} />}
               {event.fullAddress && <PopupDetail label="Address" icon={<MapPinIcon />} text={event.fullAddress} />}
               {event.ageGroup && <PopupDetail label="Age suitability" icon={<UserGroupIcon />} text={event.ageGroup} />}
